@@ -112,8 +112,8 @@
 <li class="toctree-l3"><a class="reference internal" href="../estimationSetup/index.html">4. Estimation Set-Up</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../astroTools/index.html">5. Basic Astrodynamics Tools</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../lowThrustTrajectoryDesign/index.html">6. Low-Thrust Trajectory Design Module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../mathTools/index.html">7. Basic Mathematics Tools</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../otherLibraries/index.html">8. Other Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../mathTools/index.html">6. Basic Mathematics Tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../otherLibraries/index.html">7. Other Libraries</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/index.html">Tudat Basics</a></li>
@@ -226,7 +226,8 @@
 </div>
 <p>We have defined a point-mass Earth gravity model and an aerodynamic acceleration due to Earth’s atmosphere to be used. In this example, we have only defined the type of the acceleration, without the need for any additional information. All required variables used on the computations of the accelerations are uniquely defined in the Apollo and Earth entries of the body map (provided that the required environment models have been set as discussed in <a class="reference internal" href="../environmentSetup/index.html#tudatfeaturesenvironmentindex"><span class="std std-ref">Environment Set-up</span></a>).</p>
 <p>Below a graphical representation of the acceleration setup, with the different model types and top-level architecture.</p>
-digraph
+<div class="graphviz"><object data="../../../_images/graphviz-1bb4d9f4c8fee6dff2feb02d02630e2d6a546918.svg" type="image/svg+xml" class="graphviz">
+<p class="warning">digraph
 {
    # General diagram settings
    rankdir = &quot;TB&quot;;
@@ -294,7 +295,9 @@ digraph
    &quot;Relativistic correction&quot; [href = &quot;http://tudat.tudelft.nl/tutorials/tudatFeatures/accelerationSetup/frameworkAcceleration.html#RelativisticAccelerationCorrectionSettings&quot;, target = &quot;_top&quot;];
    &quot;Empirical&quot; [href = &quot;http://tudat.tudelft.nl/tutorials/tudatFeatures/accelerationSetup/frameworkAcceleration.html#EmpiricalAccelerationSettings&quot;, target = &quot;_top&quot;];
 
-}digraph
+}</p></object></div>
+<div class="graphviz"><object data="../../../_images/graphviz-12eb171437085215e85162ffadcb3a610343290d.svg" type="image/svg+xml" class="graphviz">
+<p class="warning">digraph
 {
    # General diagram settings
    rankdir = &quot;LR&quot;;
@@ -317,7 +320,8 @@ digraph
      &quot;Input for \nmain block&quot; [fillcolor = lightblue];
      &quot;Optional input&quot;-&gt; &quot;Object requiring \nadditional information&quot; -&gt; &quot;Input for \nmain block&quot; -&gt; &quot;Main block&quot; [style = invis];
    }
-}<p>As was the case for the settings of the environment models, certain types of accelerations require additional information. An important example is the spherical harmonic acceleration. We cannot replace <code class="docutils literal notranslate"><span class="pre">central_gravity</span></code> with <code class="docutils literal notranslate"><span class="pre">spherical_harmonic_gravity</span></code> in the above, as there is still an ambiguity in how the acceleration model is defined. In particular, we now also need the maximum degree and order of the gravity field that is to be used in addition to the three properties listed above. Consequently, we have created a dedicated <a class="reference internal" href="#AccelerationSettings" title="AccelerationSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">AccelerationSettings</span></code></a> derived class for defining spherical harmonic acceleration settings: <a class="reference internal" href="#SphericalHarmonicAccelerationSettings" title="SphericalHarmonicAccelerationSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">SphericalHarmonicAccelerationSettings</span></code></a>. Updating the above example to use J<sub>2</sub>, J<sub>3</sub> and J<sub>4</sub> (maximum degree = 4; maximum order = 0), we now have:</p>
+}</p></object></div>
+<p>As was the case for the settings of the environment models, certain types of accelerations require additional information. An important example is the spherical harmonic acceleration. We cannot replace <code class="docutils literal notranslate"><span class="pre">central_gravity</span></code> with <code class="docutils literal notranslate"><span class="pre">spherical_harmonic_gravity</span></code> in the above, as there is still an ambiguity in how the acceleration model is defined. In particular, we now also need the maximum degree and order of the gravity field that is to be used in addition to the three properties listed above. Consequently, we have created a dedicated <a class="reference internal" href="#AccelerationSettings" title="AccelerationSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">AccelerationSettings</span></code></a> derived class for defining spherical harmonic acceleration settings: <a class="reference internal" href="#SphericalHarmonicAccelerationSettings" title="SphericalHarmonicAccelerationSettings"><code class="xref py py-class docutils literal notranslate"><span class="pre">SphericalHarmonicAccelerationSettings</span></code></a>. Updating the above example to use J<sub>2</sub>, J<sub>3</sub> and J<sub>4</sub> (maximum degree = 4; maximum order = 0), we now have:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">SelectedAccelerationMap</span> <span class="n">accelerationSettings</span><span class="p">;</span>
 <span class="n">accelerationSettings</span><span class="p">[</span> <span class="s">&quot;Apollo&quot;</span> <span class="p">][</span> <span class="s">&quot;Earth&quot;</span> <span class="p">].</span><span class="n">push_back</span><span class="p">(</span> <span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span> <span class="n">SphericalHarmonicAccelerationSettings</span> <span class="o">&gt;</span><span class="p">(</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">0</span> <span class="p">)</span> <span class="p">);</span>
 <span class="n">accelerationSettings</span><span class="p">[</span> <span class="s">&quot;Apollo&quot;</span> <span class="p">][</span> <span class="s">&quot;Earth&quot;</span> <span class="p">].</span><span class="n">push_back</span><span class="p">(</span> <span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span> <span class="n">AccelerationSettings</span> <span class="o">&gt;</span><span class="p">(</span> <span class="n">aerodynamic</span> <span class="p">)</span> <span class="p">);</span>

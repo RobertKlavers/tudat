@@ -112,8 +112,8 @@
 <li class="toctree-l3"><a class="reference internal" href="../estimationSetup/index.html">4. Estimation Set-Up</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../astroTools/index.html">5. Basic Astrodynamics Tools</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../lowThrustTrajectoryDesign/index.html">6. Low-Thrust Trajectory Design Module</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../mathTools/index.html">7. Basic Mathematics Tools</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../otherLibraries/index.html">8. Other Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../mathTools/index.html">6. Basic Mathematics Tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../otherLibraries/index.html">7. Other Libraries</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../basics/index.html">Tudat Basics</a></li>
@@ -196,7 +196,8 @@
 <span id="tudatfeaturesenvironmentindex"></span><h1><span class="section-number">1. </span>Environment Set-up<a class="headerlink" href="#environment-set-up" title="Permalink to this headline">¶</a></h1>
 <p>Models for the physical environment are one of the cornerstones of a numerical astrodynamics toolbox. Here, we define the environment in the broadest sense, including all physical properties of the solar system, such as atmospheres and gravity fields, but also any models for the orbits and rotations of these bodies.</p>
 <p>On this page, we will give an overview of how the environment is represented in Tudat, which models have been implemented, and how to create the environment that is tailored to your needs. A graphical representation of the basic structure for implementing the environment is shown below. For the options within these settings object, please click on the object in the figure.</p>
-digraph
+<div class="graphviz"><object data="../../../_images/graphviz-f3c0c7ae839bba3a657a4ddbabab2927f45cac70.svg" type="image/svg+xml" class="graphviz">
+<p class="warning">digraph
 {
    # General diagram settings
    rankdir = &quot;LR&quot;;
@@ -271,7 +272,9 @@ digraph
 
 
    {&quot;RadiationPressure\nInterfaceSettings&quot;, &quot;GravityField\nVariationSettings&quot; [fillcolor = lightcoral]};
-}digraph
+}</p></object></div>
+<div class="graphviz"><object data="../../../_images/graphviz-83758d49ea6ba2ddeb906e40c7b7735f194acc5c.svg" type="image/svg+xml" class="graphviz">
+<p class="warning">digraph
 {
    # General diagram settings
    rankdir = &quot;LR&quot;;
@@ -294,7 +297,8 @@ digraph
      &quot;Input for \nmain block&quot; [fillcolor = lightblue];
      &quot;Optional input&quot;-&gt; &quot;List of settings&quot; -&gt; &quot;Input for \nmain block&quot; -&gt; &quot;Main block&quot; [style = invis];
    }
-}<div class="toctree-wrapper compound">
+}</p></object></div>
+<div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="setup.html">1.1. Setting up the Environment</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="setup.html#creating-the-environment-from-bodysettings">1.1.1. Creating the environment from <code class="xref py py-class docutils literal notranslate"><span class="pre">BodySettings</span></code></a></li>
