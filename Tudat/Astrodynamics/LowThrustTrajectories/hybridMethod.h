@@ -36,11 +36,19 @@ public:
             const double maximumThrust,
             const double specificImpulse,
             const double timeOfFlight,
+            simulation_setup::NamedBodyMap& bodyMap,
+            const std::string bodyToPropagate,
+            const std::string centralBody,
+            std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
             std::shared_ptr< simulation_setup::OptimisationSettings > optimisationSettings,
             const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 10.0, 10.0 ) ):
-        LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight ),
+        LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, bodyMap[ bodyToPropagate ]->getBodyMass(), false ),
+        bodyMap_( bodyMap ),
+        bodyToPropagate_( bodyToPropagate ),
+        centralBody_(centralBody ),
         maximumThrust_( maximumThrust ),
         specificImpulse_( specificImpulse ),
+        integratorSettings_( integratorSettings ),
         optimisationSettings_( optimisationSettings ),
         initialAndFinalMEEcostatesBounds_( initialAndFinalMEEcostatesBounds )
     {
@@ -58,6 +66,7 @@ public:
             }
             else
             {
+                //Eigen::VectorXd initialGuessMEEinitialAndFinalCostates( 10 ); // No entirely sure why this is needed
                 initialGuessThrustModel_.first = optimisationSettings_->initialGuessThrustModel_.first;
             }
         }
@@ -84,9 +93,10 @@ public:
 
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
 
-        // Create Sims-Flanagan leg from the best optimisation individual.
+        // Create Hybrid leg from the best optimisation individual.
         hybridMethodModel_ = std::make_shared< HybridMethodModel >(
-                    stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_, specificImpulse_, timeOfFlight_ );
+                    stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_, specificImpulse_, timeOfFlight_,
+                    bodyMap_, bodyToPropagate_, centralBody_, integratorSettings );
 
     }
 
@@ -184,17 +194,33 @@ public:
     //! Define appropriate translational state propagator settings for the full propagation.
     std::pair< std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > >,
     std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > > > createLowThrustTranslationalStatePropagatorSettings(
-            basic_astrodynamics::AccelerationMap accelerationModelMap,
-            std::shared_ptr< propagators::DependentVariableSaveSettings > dependentVariablesToSave );
+            const std::string& bodyToPropagate,
+            const std::string& centralBody,
+            const basic_astrodynamics::AccelerationMap& accelerationModelMap,
+            const std::shared_ptr< propagators::DependentVariableSaveSettings > dependentVariablesToSave );
 
 
 private:
+
+    double centralBodyGravitationalParameter_;
+
+    //! Body map object.
+    simulation_setup::NamedBodyMap bodyMap_;
+
+    //! Name of the body to be propagated.
+    std::string bodyToPropagate_;
+
+    //! Name of the central body.
+    std::string centralBody_;
 
     //! Maximum allowed thrust.
     double maximumThrust_;
 
     //! Specific impulse.
     double specificImpulse_;
+
+    //! Integrator settings.
+    std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings_;
 
     //! Optimisation settings.
     std::shared_ptr< simulation_setup::OptimisationSettings > optimisationSettings_;

@@ -31,14 +31,21 @@ public:
                      const Eigen::Vector6d& stateAtArrival,
                      const Eigen::VectorXd& initialCoStates,
                      const Eigen::VectorXd& finalCoStates,
-                       const double centralBodyGravitationalParameter,
                      const double maximumThrust,
                      const double specificImpulse,
-                     const double timeOfFlight ):
+                     const double timeOfFlight,
+                     simulation_setup::NamedBodyMap& bodyMap,
+                     const std::string bodyToPropagate,
+                     const std::string centralBody,
+                     std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings ):
     stateAtDeparture_( stateAtDeparture ), stateAtArrival_( stateAtArrival ), initialCoStates_( initialCoStates ),
-    finalCoStates_( finalCoStates ), centralBodyGravitationalParameter_( centralBodyGravitationalParameter ),
-      maximumThrust_( maximumThrust ),
-    specificImpulse_( specificImpulse ), timeOfFlight_( timeOfFlight )
+    finalCoStates_( finalCoStates ), maximumThrust_( maximumThrust ),
+    specificImpulse_( specificImpulse ),
+    timeOfFlight_( timeOfFlight ),
+    bodyMap_( bodyMap ),
+    bodyToPropagate_( bodyToPropagate ),
+    centralBody_( centralBody ),
+    integratorSettings_( integratorSettings )
     {
         // Initialise value of the total deltaV.
         totalDeltaV_ = 0.0;
@@ -146,10 +153,10 @@ private:
     //! Modified equinoctial elements.
 
     //! Initial co-states vector.
-    Eigen::Vector6d initialCoStates_;
+    Eigen::VectorXd initialCoStates_;
 
     //! Final co-states vector.
-    Eigen::Vector6d finalCoStates_;
+    Eigen::VectorXd finalCoStates_;
 
     //! Function returning the current MEE co-states.
     std::function< Eigen::VectorXd( const double ) > costatesFunction_;
@@ -163,8 +170,17 @@ private:
     //! Time of flight for the leg.
     double timeOfFlight_;
 
-    //! Gravitational parameter of the central body of the 2-body problem.
-    double centralBodyGravitationalParameter_;
+    //! Pointer to the body map object.
+    simulation_setup::NamedBodyMap bodyMap_;
+
+    //! Name of the body to be propagated.
+    std::string bodyToPropagate_;
+
+    //! Name of the central body.
+    std::string centralBody_;
+
+    //! Integrator settings.
+    std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings_;
 
     //! Total deltaV.
     double totalDeltaV_;

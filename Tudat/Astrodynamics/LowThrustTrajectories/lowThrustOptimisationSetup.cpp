@@ -26,10 +26,7 @@ TrajectoryOptimisationProblem::TrajectoryOptimisationProblem(
     departureTimeBounds_( departureTimeBounds ),
     timeOfFlightBounds_( timeOfFlightBounds ),
     lowThrustLegSettings_( lowThrustLegSettings )
-{
-    initialSpacecraftMass_ = bodyMap_[ bodyToPropagate_ ]->getBodyMass();
-
-}
+{}
 
 
 //! Descriptive name of the problem

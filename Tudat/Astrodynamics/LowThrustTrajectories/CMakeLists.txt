@@ -25,10 +25,10 @@ if(USE_PAGMO)
     "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/simsFlanaganModel.cpp"
     "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/simsFlanagan.cpp"
     "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/simsFlanaganOptimisationSetup.cpp"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethodModel.cpp"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridOptimisationSetup.cpp"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethod.cpp"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/lowThrustOptimisationSetup.cpp"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethodModel.cpp"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridOptimisationSetup.cpp"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethod.cpp"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/lowThrustOptimisationSetup.cpp"
     )
 else()
     set(LOWTHRUSTTRAJECTORIES_SOURCES
@@ -45,10 +45,10 @@ if( USE_PAGMO )
     "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/simsFlanaganModel.h"
     "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/simsFlanagan.h"
     "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/simsFlanaganOptimisationSetup.h"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethodModel.h"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridOptimisationSetup.h"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethod.h"
-#    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/lowThrustOptimisationSetup.h"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethodModel.h"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridOptimisationSetup.h"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/hybridMethod.h"
+    "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/lowThrustOptimisationSetup.h"
     )
 else( )
     set(LOWTHRUSTTRAJECTORIES_HEADERS
@@ -70,7 +70,9 @@ if( USE_PAGMO )
     setup_custom_test_program(test_SimsFlanagan "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}")
     target_link_libraries(test_SimsFlanagan tudat_low_thrust_trajectories tudat_shape_based_methods tudat_numerical_quadrature pagmo ${TUDAT_PROPAGATION_LIBRARIES}  ${Boost_LIBRARIES})
 
-#    add_executable(test_HybridMethod "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/UnitTests/unitTestHybridMethod.cpp")
-#    setup_custom_test_program(test_HybridMethod "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}")
-#    target_link_libraries(test_HybridMethod tudat_low_thrust_trajectories tudat_numerical_quadrature pagmo ${TUDAT_PROPAGATION_LIBRARIES}  ${Boost_LIBRARIES})
+    add_executable(test_HybridMethod "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/UnitTests/unitTestHybridMethod.cpp")
+    setup_custom_test_program(test_HybridMethod "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}")
+    target_link_libraries(test_HybridMethod tudat_low_thrust_trajectories tudat_numerical_quadrature pagmo ${TUDAT_PROPAGATION_LIBRARIES}  ${Boost_LIBRARIES})
+
+    message("Enabled test_HybridMethod")
 endif( )

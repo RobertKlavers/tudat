@@ -74,6 +74,7 @@ get_target_property(TRAJECTORYSOURCES tudat_trajectory_design SOURCES)
 get_target_property(PROPULSIONSOURCES tudat_propulsion SOURCES)
 get_target_property(GROUNDSTATIONSSOURCES tudat_ground_stations SOURCES)
 if( BUILD_WITH_SOCIS_2019 )
+    message("Build With SOCIS")
     get_target_property(LOWTHRUSTTRAJECTORIESDIRSOURCES tudat_low_thrust_trajectories SOURCES)
 endif( )
 

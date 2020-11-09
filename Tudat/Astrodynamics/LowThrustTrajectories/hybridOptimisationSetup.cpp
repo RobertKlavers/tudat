@@ -114,8 +114,8 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
 
     // Transform vector of design variables into 3D vector of throttles.
-    Eigen::VectorXd initialCostates; initialCostates.resize( 5 );
-    Eigen::VectorXd finalCostates; finalCostates.resize( 5 );
+    Eigen::VectorXd initialCostates = Eigen::VectorXd::Zero( 5 );
+    Eigen::VectorXd finalCostates = Eigen::VectorXd::Zero( 5 );
 
     // Check consistency of the size of the design variables vector.
     if ( designVariables.size( ) != 10 )
@@ -124,11 +124,26 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
                                   "MEE costates sizes." );
     }
 
+    for (auto i: designVariables)
+        std::cout << i << ' ';
+
     for ( unsigned int i = 0 ; i < 5 ; i++ )
     {
-        initialCostates[ i ] = designVariables[ i ];
-        finalCostates[ i ] = designVariables[ i + 5 ];
+        initialCostates( i ) = designVariables[ i ];
+        finalCostates( i ) = designVariables[ i + 5 ];
     }
+
+    std::stringstream ss_initial;
+    ss_initial << initialCostates;
+    std::string ss_initial_str = ss_initial.str();
+
+    std::stringstream ss_final;
+    ss_final << finalCostates;
+    std::string ss_final_str = ss_final.str();
+
+
+
+    std::cout << "dayum\n";
 
     std::vector< double > fitness;
 

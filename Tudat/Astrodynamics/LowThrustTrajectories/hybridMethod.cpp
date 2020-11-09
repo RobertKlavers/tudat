@@ -31,8 +31,8 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
     pagmo::random_device::set_seed( 456 );
 
     // Create object to compute the problem fitness
-    problem prob{ HybridMethodProblem( stateAtDeparture_, stateAtArrival_, maximumThrust_, specificImpulse_, timeOfFlight_,
-                                       initialGuessThrustModel_, initialAndFinalMEEcostatesBounds_,
+    problem prob{ HybridMethodProblem( stateAtDeparture_, stateAtArrival_, maximumThrust_, specificImpulse_, timeOfFlight_, bodyMap_,
+                                       bodyToPropagate_, centralBody_, integratorSettings_, initialGuessThrustModel_, initialAndFinalMEEcostatesBounds_,
                                        optimisationSettings_->relativeToleranceConstraints_ )};
 
     std::vector< double > constraintsTolerance;
@@ -123,7 +123,8 @@ Eigen::Vector3d HybridMethod::computeCurrentThrustForce(
 void HybridMethod::getThrustForceProfile(
         std::vector< double >& epochsVector,
         std::map< double, Eigen::VectorXd >& thrustProfile,
-        std::function< double ( const double ) > specificImpulseFunction )
+        std::function< double ( const double ) > specificImpulseFunction,
+        std::shared_ptr<numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
     thrustProfile.clear( );
 
@@ -275,9 +276,12 @@ basic_astrodynamics::AccelerationMap HybridMethod::retrieveLowThrustAcceleration
 
 //! Define appropriate translational state propagator settings for the full propagation.
 std::pair< std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > >,
-std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > > > HybridMethod::createLowThrustTranslationalStatePropagatorSettings(
-        basic_astrodynamics::AccelerationMap accelerationModelMap,
-        std::shared_ptr< propagators::DependentVariableSaveSettings > dependentVariablesToSave )
+std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > > >
+HybridMethod::createLowThrustTranslationalStatePropagatorSettings(
+        const std::string& bodyToPropagate,
+        const std::string& centralBody,
+        const basic_astrodynamics::AccelerationMap& accelerationModelMap,
+        const std::shared_ptr< propagators::DependentVariableSaveSettings > dependentVariablesToSave )
 {
 
     // Create termination conditions settings.
