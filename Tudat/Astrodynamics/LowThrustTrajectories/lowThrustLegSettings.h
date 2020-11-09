@@ -24,7 +24,7 @@
 #include <functional>
 
 #if( USE_PAGMO )
-//    #include "Tudat/Astrodynamics/LowThrustTrajectories/hybridMethod.h"
+    #include "Tudat/Astrodynamics/LowThrustTrajectories/hybridMethod.h"
     #include "Tudat/Astrodynamics/LowThrustTrajectories/simsFlanagan.h"
 #endif
 #include "Tudat/Astrodynamics/LowThrustTrajectories/ShapeBasedMethods/hodographicShaping.h"
