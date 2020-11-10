@@ -117,6 +117,7 @@ double LowThrustLeg::computeCurrentMass(
     bodyMapTest[ bodyToPropagate ] = std::make_shared< simulation_setup::Body >( );
     bodyMapTest.at( bodyToPropagate )->setConstantBodyMass( massInitialEpoch );
 
+    std::cout << ";";
 
     // Retrieve acceleration map.
     basic_astrodynamics::AccelerationMap accelerationMap;
@@ -174,6 +175,7 @@ void LowThrustLeg::getMassProfile(
 
     for ( unsigned int i = 0 ; i < epochsVector.size() ; i++ )
     {
+        std::cout << "i: " << i << "\n";
         if ( ( i > 0 ) && ( epochsVector.at( i ) < epochsVector.at( i - 1 ) ) )
         {
             throw std::runtime_error( "Error when retrieving the mass profile of a low-thrust trajectory, "

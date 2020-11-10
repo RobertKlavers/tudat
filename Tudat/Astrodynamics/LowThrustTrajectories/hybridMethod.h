@@ -33,6 +33,8 @@ public:
     HybridMethod(
             const Eigen::Vector6d& stateAtDeparture,
             const Eigen::Vector6d& stateAtArrival,
+            const double centralBodyGravitationalParameter,
+            const double initialSpacecraftMass,
             const double maximumThrust,
             const double specificImpulse,
             const double timeOfFlight,
@@ -42,7 +44,8 @@ public:
             std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
             std::shared_ptr< simulation_setup::OptimisationSettings > optimisationSettings,
             const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 10.0, 10.0 ) ):
-        LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, bodyMap[ bodyToPropagate ]->getBodyMass(), false ),
+        LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, initialSpacecraftMass, true ),
+        centralBodyGravitationalParameter_( centralBodyGravitationalParameter ),
         bodyMap_( bodyMap ),
         bodyToPropagate_( bodyToPropagate ),
         centralBody_(centralBody ),
@@ -52,9 +55,6 @@ public:
         optimisationSettings_( optimisationSettings ),
         initialAndFinalMEEcostatesBounds_( initialAndFinalMEEcostatesBounds )
     {
-
-        // Store initial spacecraft mass.
-        initialSpacecraftMass_ = bodyMap_[ bodyToPropagate_ ]->getBodyMass();
 
         // Convert the thrust model proposed as initial guess into simplified thrust model adapted to the hybrid method.
         if ( optimisationSettings_->initialGuessThrustModel_.first.size( ) != 0 )
@@ -91,7 +91,7 @@ public:
             finalCostates[ i ] = championDesignVariables_[ i + 5 ];
         }
 
-        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
+        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass_ );
 
         // Create Hybrid leg from the best optimisation individual.
         hybridMethodModel_ = std::make_shared< HybridMethodModel >(
@@ -235,9 +235,6 @@ private:
 
     //! Design variables vector corresponding to the optimisation best individual.
     std::vector< double > championDesignVariables_;
-
-    //! Initial mass of the spacecraft.
-    double initialSpacecraftMass_;
 
     //! Hybrid method leg corresponding to the best optimisation output.
     std::shared_ptr< HybridMethodModel > hybridMethodModel_;
