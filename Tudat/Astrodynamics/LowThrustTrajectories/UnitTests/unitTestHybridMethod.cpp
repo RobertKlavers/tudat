@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE( test_hybrid_method_implementation )
     };
 
     double julianDate = 1000.0 * physical_constants::JULIAN_DAY;
-    double timeOfFlight = 1.0 * physical_constants::JULIAN_DAY;
+    double timeOfFlight = 100.0 * physical_constants::JULIAN_DAY;
 
     // Define body settings for simulation.
     std::vector< std::string > bodiesToCreate;
@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE( test_hybrid_method_implementation )
                 finalKeplerianElements, bodyMap[ "Earth" ]->getGravityFieldModel()->getGravitationalParameter() );
 
     // Define integrator settings.
-    double stepSize = ( timeOfFlight ) / static_cast< double >( 4000 );
+    double stepSize = ( timeOfFlight ) / static_cast< double >( 40000 );
     std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings =
             std::make_shared< numerical_integrators::IntegratorSettings< double > >
             ( numerical_integrators::rungeKutta4, 0.0, stepSize );
