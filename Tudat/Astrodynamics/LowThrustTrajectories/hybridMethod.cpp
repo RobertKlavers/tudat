@@ -253,7 +253,7 @@ Eigen::Vector6d HybridMethod::computeCurrentStateVector( const double currentTim
     }
     else
     {
-        stateVector = hybridMethodModel_->propagateTrajectory( 0.0, currentTime, stateAtDeparture_, initialMass_ );
+        stateVector = hybridMethodModel_->propagateTrajectory( 0.0, currentTime, stateAtDeparture_, initialMass_ )[0];
     }
 
     return stateVector;

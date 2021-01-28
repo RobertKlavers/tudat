@@ -89,7 +89,7 @@ public:
     Eigen::Vector6d propagateTrajectory( );
 
     //! Propagate the spacecraft trajectory to a given time.
-    Eigen::Vector6d  propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass );
+    std::vector<Eigen::Vector6d>  propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass );
 
     //! Propagate the trajectory to set of epochs as a function of theta.
     std::map< double, Eigen::Vector6d > propagateTrajectoryForTheta(
