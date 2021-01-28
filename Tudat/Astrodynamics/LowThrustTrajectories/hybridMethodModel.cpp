@@ -11,6 +11,7 @@
 
 
 #include <iostream>
+#include <Tudat/SimulationSetup/tudatSimulationHeader.h>
 #include "Tudat/Astrodynamics/LowThrustTrajectories/hybridMethodModel.h"
 #include "Tudat/Mathematics/NumericalQuadrature/createNumericalQuadrature.h"
 #include "Tudat/Astrodynamics/BasicAstrodynamics/modifiedEquinoctialElementConversions.h"
@@ -171,6 +172,77 @@ Eigen::Vector6d HybridMethodModel::propagateTrajectory( double initialTime, doub
 }
 
 
+    std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectoryForTheta(
+            std::vector< double > epochs, std::map< double, Eigen::Vector6d >& propagatedTrajectory )
+    {
+        // Initialise propagated state.
+        Eigen::Vector6d propagatedState = stateAtDeparture_;
+
+        // Initialise mass of the spacecraft at departure.
+        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
+        double currentMass = initialSpacecraftMass_;
+
+        double gravitationalParameter = bodyMap_["Earth"]->getGravityFieldModel()->getGravitationalParameter();
+
+        Eigen::Vector6d keplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
+                                                                                                         gravitationalParameter);
+        std::cout << keplerianState << std::endl;
+
+        double deltaTheta = (2.0 * mathematical_constants::PI) / epochs.size();
+        double currentTime = 0.0;
+
+        for ( int epochIndex = 0 ; epochIndex < epochs.size( ) ; epochIndex++ )
+        {
+            double currentTheta = epochs[ epochIndex ];
+            if ( epochIndex > 0 )
+            {
+                if ( currentTheta < epochs[ epochIndex - 1 ] )
+                {
+                    throw std::runtime_error( "Error when propagating trajectory with hybrid method, epochs at which the trajectory should be "
+                                              "computed are not in increasing order." );
+                }
+            }
+            if ( ( currentTheta < 0.0 ) || ( currentTheta > timeOfFlight_ ) )
+            {
+                throw std::runtime_error( "Error when propagating trajectory with hybrid method, epochs at which the trajectory should be "
+                                          "computed are not constrained between 0.0 and timeOfFlight." );
+            }
+
+            double a = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
+                                                                             gravitationalParameter)[0];
+            double r = propagatedState.segment(0 ,3 ).norm();
+
+            std::cout << "r: " << r << ", a: " << a << std::endl;
+
+            double deltaTime = deltaTheta *
+                               (r / (a * std::sqrt(gravitationalParameter / std::pow(a, 3.0))));
+
+
+            std::cout << "Epoch: " << epochIndex << ", currentTime: " << currentTime << ". dT: " << deltaTime << std::endl;
+
+            if ( epochIndex == 0 )
+            {
+                if ( currentTheta > 0.0 )
+                {
+                    propagatedState = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
+                    currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+                }
+                propagatedTrajectory[ currentTime ] = propagatedState;
+            }
+            else
+            {
+                propagatedState = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
+                currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+                propagatedTrajectory[ currentTime ] = propagatedState;
+            }
+            currentTime = currentTime + deltaTime;
+
+        }
+
+        bodyMap_[ centralBody_ ]->setConstantBodyMass( initialSpacecraftMass_ );
+
+        return propagatedTrajectory;
+    }
 //! Propagate the trajectory to set of epochs.
 std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         std::vector< double > epochs, std::map< double, Eigen::Vector6d >& propagatedTrajectory )
