@@ -116,7 +116,7 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 
     // === CUSTOM TEST THRUST!  ===
 //    /*
-    double thrustMagnitude = 10.0;
+    double thrustMagnitude = 1.0;
     double specificImpulse = 2000.0;
     std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
             std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
@@ -193,10 +193,13 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
                 propagationResultTime, propagationResult);
 
-        Eigen::Vector6d computedMMEStateDerivatives = currentStateDerivative.segment(0, 6);
+        //        currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
+//                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
 
-        std::cout << "-- computedMMEStateDerivatives -- \n" << computedMMEStateDerivatives << std::endl;
-        std::cout << "-- computedCartesianState -- \n" << computedCartesianState << std::endl;
+        Eigen::Vector6d computedMMEStateDerivatives = currentStateDerivative.segment(0, 6);
+//
+//        std::cout << "-- computedMMEStateDerivatives -- \n" << computedMMEStateDerivatives << std::endl;
+//        std::cout << "-- computedCartesianState -- \n" << computedCartesianState << std::endl;
 
     // Retrieve state and mass of the spacecraft at the end of the propagation.
     if ( finalTime == timeOfFlight_ )
@@ -208,11 +211,9 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 }
 
 
-    Eigen::Vector6d HybridMethodModel::propagateTrajectoryForTheta(
-            std::map< double, Eigen::Vector6d >& propagatedTrajectory, int numberOfSteps )
-    {
+    Eigen::Vector6d HybridMethodModel::computeAverages(const Eigen::Vector6d& fromCartesianState, const double fromTime, int numberOfSteps, double averagingTime )    {
         // Initialise propagated state.
-        Eigen::Vector6d propagatedState = stateAtDeparture_;
+        Eigen::Vector6d propagatedState = fromCartesianState;
 
         std::vector<Eigen::Vector6d> propagationResult;
         std::vector<Eigen::Vector6d> stateDerivatives;
@@ -227,8 +228,8 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         }
 
         // Initialise mass of the spacecraft at departure.
-        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
-        double currentMass = initialSpacecraftMass_;
+//        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
+//        double currentMass = initialSpacecraftMass_;
 
         double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
 
@@ -240,7 +241,12 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         // Convert from theta to time (container vector)
         std::vector< double > timeEpochs;
 
-        double currentTime = 0.0;
+        double currentTime = fromTime;
+        double orbitTime = 0.0;
+        // Does this work to initialize the state derivatives?
+        double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+        propagationResult = propagateTrajectory( currentTime, currentTime, propagatedState, currentMass );
+        stateDerivatives.push_back(propagationResult[1]);
 
         for ( int epochIndex = 0 ; epochIndex < thetaEpochs.size( ) ; epochIndex++ )
         {
@@ -258,8 +264,11 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
             double deltaTime = deltaTheta *
                                (r / (a * std::sqrt(gravitationalParameter / std::pow(a, 3.0))));
 
-
             std::cout << "Epoch: " << epochIndex << ", cTime: " << currentTime << ", cTheta: " << currentTheta << ", dT: " << deltaTime << std::endl;
+
+            currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+
+
 
             if ( epochIndex == 0 )
             {
@@ -267,7 +276,6 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
                 {
                     propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
 
-                    currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
                     propagatedState = propagationResult[0];
 
                     stateDerivatives.push_back(propagationResult[1]);
@@ -277,28 +285,41 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
             {
                 propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
 
-                currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+//                currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
                 propagatedState = propagationResult[0];
 
                 stateDerivatives.push_back(propagationResult[1]);
             }
-            propagatedTrajectory[ currentTime ] =  propagatedState;
-            currentTime = currentTime + deltaTime;
+//            propagatedTrajectory[ currentTime ] = propagatedState;
+            currentTime += deltaTime;
+            orbitTime += deltaTime;
         }
 
-        double orbitPeriod = currentTime;
+//        double orbitPeriod = currentTime;
 
-        bodyMap_[ centralBody_ ]->setConstantBodyMass( initialSpacecraftMass_ );
+//        bodyMap_[ centralBody_ ]->setConstantBodyMass( initialSpacecraftMass_ );
 
         // Create Trapezoidal Quadrature Integrator
         tudat::numerical_quadrature::TrapezoidNumericalQuadrature< double, Eigen::Vector6d > integrator(
                 timeEpochs, stateDerivatives );
         Eigen::Vector6d computedIntegralTrapezoid = integrator.getQuadrature();
+
+        Eigen::Vector6d averageStateProgression = computedIntegralTrapezoid / orbitTime;
+
+        Eigen::Vector6d fromMEEState = orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(fromCartesianState, gravitationalParameter, false);
+
+        Eigen::Vector6d toMEEState = fromMEEState + (averageStateProgression * averagingTime);
+
+        Eigen::Vector6d toCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(toMEEState, gravitationalParameter, false);
+
+        std::cout << "Computed T_orb: " << orbitTime << std::endl;
         std::cout << "-- Trapezoidal Integral: \n" << computedIntegralTrapezoid << std::endl;
+        std::cout << "-- averageStateProgression: \n" << averageStateProgression << std::endl;
+        std::cout << "-- fromState: \n" << fromMEEState << std::endl;
+        std::cout << "-- toState: \n" << toMEEState << std::endl;
+        std::cout << "-- toCartesianState: \n" << toCartesianState << std::endl;
 
-        Eigen::Vector6d averageStateProgression = computedIntegralTrapezoid / orbitPeriod;
-
-        return averageStateProgression;
+        return toCartesianState;
     }
 //! Propagate the trajectory to set of epochs.
 std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(

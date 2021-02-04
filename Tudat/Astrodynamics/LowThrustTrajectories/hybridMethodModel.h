@@ -92,8 +92,7 @@ public:
     std::vector<Eigen::Vector6d>  propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass );
 
     //! Propagate the trajectory to set of epochs as a function of theta.
-    Eigen::Vector6d propagateTrajectoryForTheta(
-            std::map< double, Eigen::Vector6d >& propagatedTrajectory, int numberOfSteps );
+    Eigen::Vector6d computeAverages(const Eigen::Vector6d& currentState, double currentTime, int numberOfSteps, double averagingTime );
 
     //! Propagate the trajectory to set of epochs.
     std::map< double, Eigen::Vector6d > propagateTrajectory(
