@@ -114,7 +114,8 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
                                                                 basic_astrodynamics::central_gravity ) );
 //    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
 
-    // Define thrust settings
+    // === CUSTOM TEST THRUST!  ===
+//    /*
     double thrustMagnitude = 10.0;
     double specificImpulse = 2000.0;
     std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
@@ -125,6 +126,7 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
     // Define acceleration model settings.
     bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back(
             std::make_shared< simulation_setup::ThrustAccelerationSettings >( thrustDirectionGuidanceSettings, thrustMagnitudeSettings ) );
+//    */
 
     simulation_setup::SelectedAccelerationMap accelerationMap;
     accelerationMap[ bodyToPropagate_ ] = bodyToPropagateAccelerations;
@@ -206,8 +208,8 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 }
 
 
-    std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectoryForTheta(
-            std::vector< double > epochs, std::map< double, Eigen::Vector6d >& propagatedTrajectory )
+    Eigen::Vector6d HybridMethodModel::propagateTrajectoryForTheta(
+            std::map< double, Eigen::Vector6d >& propagatedTrajectory, int numberOfSteps )
     {
         // Initialise propagated state.
         Eigen::Vector6d propagatedState = stateAtDeparture_;
@@ -215,45 +217,44 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         std::vector<Eigen::Vector6d> propagationResult;
         std::vector<Eigen::Vector6d> stateDerivatives;
 
+        // Generate Epochs for Theta
+        std::vector< double > thetaEpochs;
+        double deltaTheta = (2.0 * mathematical_constants::PI) / numberOfSteps;
+
+        for ( int i = 1 ; i <= numberOfSteps ; i++ )
+        {
+            thetaEpochs.push_back( deltaTheta * i );
+        }
+
         // Initialise mass of the spacecraft at departure.
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
         double currentMass = initialSpacecraftMass_;
 
         double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
 
+        // Temp Debug print
         Eigen::Vector6d keplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
                                                                                                          gravitationalParameter);
         std::cout << "-- Keplerian Elements -- \n " << keplerianState << std::endl;
 
+        // Convert from theta to time (container vector)
         std::vector< double > timeEpochs;
 
-        double deltaTheta = (2.0 * mathematical_constants::PI) / epochs.size();
         double currentTime = 0.0;
 
-        for ( int epochIndex = 0 ; epochIndex < epochs.size( ) ; epochIndex++ )
+        for ( int epochIndex = 0 ; epochIndex < thetaEpochs.size( ) ; epochIndex++ )
         {
-            double currentTheta = epochs[ epochIndex ];
+            double currentTheta = thetaEpochs[ epochIndex ];
             timeEpochs.push_back(currentTime);
-            if ( epochIndex > 0 )
-            {
-                if ( currentTheta < epochs[ epochIndex - 1 ] )
-                {
-                    throw std::runtime_error( "Error when propagating trajectory with hybrid method, epochs at which the trajectory should be "
-                                              "computed are not in increasing order." );
-                }
-            }
-            if ( ( currentTheta < 0.0 ) || ( currentTheta > timeOfFlight_ ) )
-            {
-                throw std::runtime_error( "Error when propagating trajectory with hybrid method, epochs at which the trajectory should be "
-                                          "computed are not constrained between 0.0 and timeOfFlight." );
-            }
 
             double a = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
                                                                              gravitationalParameter)[0];
             double r = propagatedState.segment(0 ,3 ).norm();
 
+            // DEBUG
             std::cout << "r: " << r << ", a: " << a << std::endl;
 
+            // Convert to time delta
             double deltaTime = deltaTheta *
                                (r / (a * std::sqrt(gravitationalParameter / std::pow(a, 3.0))));
 
@@ -285,6 +286,8 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
             currentTime = currentTime + deltaTime;
         }
 
+        double orbitPeriod = currentTime;
+
         bodyMap_[ centralBody_ ]->setConstantBodyMass( initialSpacecraftMass_ );
 
         // Create Trapezoidal Quadrature Integrator
@@ -293,7 +296,9 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         Eigen::Vector6d computedIntegralTrapezoid = integrator.getQuadrature();
         std::cout << "-- Trapezoidal Integral: \n" << computedIntegralTrapezoid << std::endl;
 
-        return propagatedTrajectory;
+        Eigen::Vector6d averageStateProgression = computedIntegralTrapezoid / orbitPeriod;
+
+        return averageStateProgression;
     }
 //! Propagate the trajectory to set of epochs.
 std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
