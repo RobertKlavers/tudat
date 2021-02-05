@@ -116,12 +116,12 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 
     // === CUSTOM TEST THRUST!  ===
 //    /*
-    double thrustMagnitude = 1.0;
-    double specificImpulse = 2000.0;
+//    double thrustMagnitude = 1.0;
+//    double specificImpulse = 2000.0;
     std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
             std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
     std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings =
-            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( thrustMagnitude, specificImpulse );
+            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
 
     // Define acceleration model settings.
     bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back(
@@ -191,7 +191,7 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         // Find the state derivatives at t_f
         Eigen::VectorXd currentStateDerivative;
         currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
-                propagationResultTime, propagationResult);
+                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
 
         //        currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
 //                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
@@ -222,7 +222,7 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         std::vector< double > thetaEpochs;
         double deltaTheta = (2.0 * mathematical_constants::PI) / numberOfSteps;
 
-        for ( int i = 1 ; i <= numberOfSteps ; i++ )
+        for ( int i = 0 ; i <= numberOfSteps ; i++ )
         {
             thetaEpochs.push_back( deltaTheta * i );
         }
@@ -245,13 +245,12 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         double orbitTime = 0.0;
         // Does this work to initialize the state derivatives?
         double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
-        propagationResult = propagateTrajectory( currentTime, currentTime, propagatedState, currentMass );
-        stateDerivatives.push_back(propagationResult[1]);
+//        propagationResult = propagateTrajectory( currentTime, currentTime, propagatedState, currentMass );
+//        stateDerivatives.push_back(propagationResult[1]);
 
         for ( int epochIndex = 0 ; epochIndex < thetaEpochs.size( ) ; epochIndex++ )
         {
             double currentTheta = thetaEpochs[ epochIndex ];
-            timeEpochs.push_back(currentTime);
 
             double a = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
                                                                              gravitationalParameter)[0];
@@ -268,32 +267,18 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 
             currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
 
+            propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
+            propagatedState = propagationResult[0];
 
+            timeEpochs.push_back(currentTime);
+            stateDerivatives.push_back(propagationResult[1]);
 
-            if ( epochIndex == 0 )
-            {
-                if ( currentTheta > 0.0 )
-                {
-                    propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
-
-                    propagatedState = propagationResult[0];
-
-                    stateDerivatives.push_back(propagationResult[1]);
-                }
-            }
-            else
-            {
-                propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
-
-//                currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
-                propagatedState = propagationResult[0];
-
-                stateDerivatives.push_back(propagationResult[1]);
-            }
 //            propagatedTrajectory[ currentTime ] = propagatedState;
             currentTime += deltaTime;
             orbitTime += deltaTime;
         }
+
+//        std::cout << "thetaEpochs:\n" << thetaEpochs << std::endl;
 
 //        double orbitPeriod = currentTime;
 
@@ -312,6 +297,7 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 
         Eigen::Vector6d toCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(toMEEState, gravitationalParameter, false);
 
+        std::cout << "n_stateDerivatives: " << stateDerivatives.size() << std::endl;
         std::cout << "Computed T_orb: " << orbitTime << std::endl;
         std::cout << "-- Trapezoidal Integral: \n" << computedIntegralTrapezoid << std::endl;
         std::cout << "-- averageStateProgression: \n" << averageStateProgression << std::endl;
