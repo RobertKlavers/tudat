@@ -67,17 +67,20 @@ std::shared_ptr< propulsion::BodyFixedForceDirectionGuidance  > createThrustGuid
                         &ephemerides::getRelativeState, std::placeholders::_1, bodyStateFunction, centralBodyStateFunction );
             std::function< Eigen::Vector3d( const double ) > thrustDirectionFunction;
 
+            //TODO: Remove this hacky way of temporarily setting thrust force direction out-of-plane
+            std::shared_ptr< ephemerides::RotationalEphemeris > rotationalEphemeris = bodyMap.at( "Earth" )->getRotationalEphemeris( );
+
             // Create force direction function.
             if( thrustDirectionFromStateGuidanceSettings->isColinearWithVelocity_ )
             {
                 thrustDirectionFunction =
-                        std::bind( &propulsion::getForceDirectionColinearWithVelocity, stateFunction, std::placeholders::_1,
+                        std::bind( &propulsion::getForceDirectionOutOfPlane, stateFunction, rotationalEphemeris,std::placeholders::_1,
                                      thrustDirectionFromStateGuidanceSettings->directionIsOppositeToVector_ );
             }
             else
             {
                 thrustDirectionFunction =
-                        std::bind( &propulsion::getForceDirectionColinearWithPosition, stateFunction, std::placeholders::_1,
+                        std::bind( &propulsion::getForceDirectionOutOfPlane, stateFunction, rotationalEphemeris,std::placeholders::_1,
                                      thrustDirectionFromStateGuidanceSettings->directionIsOppositeToVector_ );
             }
 

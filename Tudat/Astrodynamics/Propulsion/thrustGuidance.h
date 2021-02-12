@@ -16,6 +16,7 @@
 
 #include "Tudat/Astrodynamics/ReferenceFrames/referenceFrameTransformations.h"
 #include "Tudat/Astrodynamics/ReferenceFrames/dependentOrientationCalculator.h"
+#include "Tudat/Astrodynamics/Ephemerides/rotationalEphemeris.h"
 
 #include "Tudat/Basics/basicTypedefs.h"
 #include "Tudat/Mathematics/BasicMathematics/linearAlgebra.h"
@@ -97,6 +98,11 @@ protected:
     //! Current direction of the force in the body-fixed frame as set by last call to updateCalculator function.
     Eigen::Vector3d currentBodyFixedForceDirection_;
 };
+
+Eigen::Vector3d getForceDirectionOutOfPlane(
+        const std::function< void( Eigen::Vector6d& ) > currentStateFunction,
+        std::shared_ptr< ephemerides::RotationalEphemeris > rotationalEphemeris,
+        const double currentTime, const bool putForceInOppositeDirection );
 
 
 //! Function to get the unit vector colinear with velocity segment of a translational state.
