@@ -1107,6 +1107,10 @@ createThrustAcceleratioModel(
                 getBodyFixedThrustDirection( thrustAccelerationSettings->thrustMagnitudeSettings_, bodyMap,
                                              nameOfBodyUndergoingThrust ), magnitudeUpdateSettings );
 
+    const std::function<Eigen::Vector3d()> &bodyFixedFunction = getBodyFixedThrustDirection(
+            thrustAccelerationSettings->thrustMagnitudeSettings_, bodyMap, nameOfBodyUndergoingThrust);
+//    std::cout << bodyFixedFunction() << std::endl;
+
     // Create thrust magnitude model
     std::shared_ptr< propulsion::ThrustMagnitudeWrapper > thrustMagnitude = createThrustMagnitudeWrapper(
                 thrustAccelerationSettings->thrustMagnitudeSettings_, bodyMap, nameOfBodyUndergoingThrust,

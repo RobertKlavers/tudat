@@ -101,7 +101,7 @@ protected:
 
 Eigen::Vector3d getForceDirectionOutOfPlane(
         const std::function< void( Eigen::Vector6d& ) > currentStateFunction,
-        std::shared_ptr< ephemerides::RotationalEphemeris > rotationalEphemeris,
+        const std::function< Eigen::Quaterniond() > rotationToGlobalFrameFunction,
         const double currentTime, const bool putForceInOppositeDirection );
 
 

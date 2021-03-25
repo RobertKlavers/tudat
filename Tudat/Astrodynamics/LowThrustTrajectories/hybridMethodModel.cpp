@@ -94,14 +94,14 @@ basic_astrodynamics::AccelerationMap HybridMethodModel::getLowThrustTrajectoryAc
 //! Propagate the spacecraft trajectory to time-of-flight.
 Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
 {
-    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ )[0];
+    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
     return propagatedState;
 }
 
 
 
 //! Propagate the spacecraft trajectory to a given time.
-std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass )
+std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass )
 {
     // Re-initialise integrator settings.
     integratorSettings_->initialTime_ = initialTime;
@@ -118,6 +118,11 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 //    /*
 //    double thrustMagnitude = 1.0;
 //    double specificImpulse = 2000.0;
+
+//    const Eigen::Vector3d bodyFixedThrustDirection = -1 * Eigen::Vector3d::UnitX( );
+//    std::cout << "bodyFixedThrustDirection: [" << bodyFixedThrustDirection[0] << ", " << bodyFixedThrustDirection[1] << ", " << bodyFixedThrustDirection[2] << "]" << std::endl;
+
+
     std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
             std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
     std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings =
@@ -190,8 +195,9 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
 
         // Find the state derivatives at t_f
         Eigen::VectorXd currentStateDerivative;
+        double currentTime = numericalSolution.cbegin( )->first;
         currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
-                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
+                currentTime, numericalSolution.at(currentTime));
 
         //        currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
 //                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
@@ -207,15 +213,15 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         massAtTimeOfFlight_ = propagationResult[ 6 ];
     }
 
-    return std::vector<Eigen::Vector6d> {computedCartesianState, computedMMEStateDerivatives};
+    return std::pair<Eigen::Vector6d, Eigen::Vector6d> (computedCartesianState, computedMMEStateDerivatives);
 }
 
 
-    Eigen::Vector6d HybridMethodModel::computeAverages(const Eigen::Vector6d& fromCartesianState, const double fromTime, int numberOfSteps, double averagingTime )    {
+    std::pair< double, Eigen::Vector6d > HybridMethodModel::computeAverages(const Eigen::Vector6d& fromCartesianState, const double fromTime, int numberOfSteps, double averagingTime )    {
         // Initialise propagated state.
         Eigen::Vector6d propagatedState = fromCartesianState;
 
-        std::vector<Eigen::Vector6d> propagationResult;
+        // std::vector<Eigen::Vector6d> propagationResult;
         std::vector<Eigen::Vector6d> stateDerivatives;
 
         // Generate Epochs for Theta
@@ -236,46 +242,37 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
         // Temp Debug print
         Eigen::Vector6d keplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
                                                                                                          gravitationalParameter);
-        std::cout << "-- Keplerian Elements -- \n " << keplerianState << std::endl;
+        // std::cout << "-- Keplerian Elements -- \n " << keplerianState << std::endl;
 
         // Convert from theta to time (container vector)
         std::vector< double > timeEpochs;
 
         double currentTime = fromTime;
-        double orbitTime = 0.0;
         // Does this work to initialize the state derivatives?
-        double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+        // double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
 //        propagationResult = propagateTrajectory( currentTime, currentTime, propagatedState, currentMass );
 //        stateDerivatives.push_back(propagationResult[1]);
 
         for ( int epochIndex = 0 ; epochIndex < thetaEpochs.size( ) ; epochIndex++ )
         {
-            double currentTheta = thetaEpochs[ epochIndex ];
-
-            double a = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
-                                                                             gravitationalParameter)[0];
+            // Convert theta to time
+            double a = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState, gravitationalParameter)[0];
             double r = propagatedState.segment(0 ,3 ).norm();
 
-            // DEBUG
-            std::cout << "r: " << r << ", a: " << a << std::endl;
+            double deltaTime = deltaTheta * (r / (a * std::sqrt(gravitationalParameter / std::pow(a, 3.0))));
 
-            // Convert to time delta
-            double deltaTime = deltaTheta *
-                               (r / (a * std::sqrt(gravitationalParameter / std::pow(a, 3.0))));
+            // Propagate to t + dt
+            double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
 
-            std::cout << "Epoch: " << epochIndex << ", cTime: " << currentTime << ", cTheta: " << currentTheta << ", dT: " << deltaTime << std::endl;
+            std::pair<Eigen::Vector6d, Eigen::Vector6d> propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
 
-            currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
-
-            propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
-            propagatedState = propagationResult[0];
-
+            // Update State Derivative result vector
             timeEpochs.push_back(currentTime);
-            stateDerivatives.push_back(propagationResult[1]);
+            stateDerivatives.push_back(propagationResult.second);
 
-//            propagatedTrajectory[ currentTime ] = propagatedState;
+            // Update States
+            propagatedState = propagationResult.first;
             currentTime += deltaTime;
-            orbitTime += deltaTime;
         }
 
 //        std::cout << "thetaEpochs:\n" << thetaEpochs << std::endl;
@@ -289,23 +286,29 @@ std::vector<Eigen::Vector6d>  HybridMethodModel::propagateTrajectory( double ini
                 timeEpochs, stateDerivatives );
         Eigen::Vector6d computedIntegralTrapezoid = integrator.getQuadrature();
 
-        Eigen::Vector6d averageStateProgression = computedIntegralTrapezoid / orbitTime;
+        Eigen::Vector6d averageStateProgression = computedIntegralTrapezoid / (currentTime - fromTime);
 
-        Eigen::Vector6d fromMEEState = orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(fromCartesianState, gravitationalParameter, false);
+        Eigen::Vector6d propagatedMEEState = orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(propagatedState, gravitationalParameter, false);
 
-        Eigen::Vector6d toMEEState = fromMEEState + (averageStateProgression * averagingTime);
+        double finalOAtime = fromTime + averagingTime;
+
+        Eigen::Vector6d toMEEState = propagatedMEEState + (averageStateProgression * (finalOAtime - currentTime));
 
         Eigen::Vector6d toCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(toMEEState, gravitationalParameter, false);
 
-        std::cout << "n_stateDerivatives: " << stateDerivatives.size() << std::endl;
-        std::cout << "Computed T_orb: " << orbitTime << std::endl;
-        std::cout << "-- Trapezoidal Integral: \n" << computedIntegralTrapezoid << std::endl;
-        std::cout << "-- averageStateProgression: \n" << averageStateProgression << std::endl;
-        std::cout << "-- fromState: \n" << fromMEEState << std::endl;
-        std::cout << "-- toState: \n" << toMEEState << std::endl;
-        std::cout << "-- toCartesianState: \n" << toCartesianState << std::endl;
+        std::pair< double, Eigen::Vector6d > finalOAState(finalOAtime, toCartesianState);
+        //
+        // std::cout << "n_stateDerivatives: " << stateDerivatives.size() << std::endl;
+        // std::cout << "Computed T_orb: " << orbitTime << std::endl;
+        // std::cout << "-- Trapezoidal Integral: \n" << computedIntegralTrapezoid << std::endl;
+        // std::cout << "-- averageStateProgression: \n" << averageStateProgression << std::endl;
+        // std::cout << "-- fromState: \n" << propagatedMEEState << std::endl;
+        // std::cout << "-- toState: \n" << toMEEState << std::endl;
+        // std::cout << "-- toCartesianState: \n" << toCartesianState << std::endl;
 
-        return toCartesianState;
+        std::cout << "t0: " << fromTime/physical_constants::JULIAN_DAY << ", tf: " << finalOAtime/physical_constants::JULIAN_DAY << std::endl;
+
+        return finalOAState;
     }
 //! Propagate the trajectory to set of epochs.
 std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
@@ -341,14 +344,14 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         {
             if ( currentTime > 0.0 )
             {
-                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass )[0];
+                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass ).first;
                 currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
             }
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
         else
         {
-            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass )[0];
+            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass ).first;
             currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
