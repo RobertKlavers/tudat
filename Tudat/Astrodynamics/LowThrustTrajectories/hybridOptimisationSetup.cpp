@@ -127,23 +127,25 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     for (auto i: designVariables)
         std::cout << i << ' ';
 
+    std::cout << std::endl;
+
     for ( unsigned int i = 0 ; i < 5 ; i++ )
     {
         initialCostates( i ) = designVariables[ i ];
         finalCostates( i ) = designVariables[ i + 5 ];
     }
 
-    std::stringstream ss_initial;
-    ss_initial << initialCostates;
-    std::string ss_initial_str = ss_initial.str();
-
-    std::stringstream ss_final;
-    ss_final << finalCostates;
-    std::string ss_final_str = ss_final.str();
-
-
-
-    std::cout << "dayum\n";
+    // std::stringstream ss_initial;
+    // ss_initial << initialCostates;
+    // std::string ss_initial_str = ss_initial.str();
+    //
+    // std::stringstream ss_final;
+    // ss_final << finalCostates;
+    // std::string ss_final_str = ss_final.str();
+    //
+    //
+    //
+    // std::cout << "dayum\n";
 
     std::vector< double > fitness;
 
@@ -156,48 +158,74 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     Eigen::Vector6d finalPropagatedState = currentLeg.propagateTrajectory( );
 
     // Convert final propagated state to MEE.
-    Eigen::Vector6d finalPropagatedMEEstate = orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
+    Eigen::Vector6d finalPropagatedMEEstate = orbital_element_conversions::convertCartesianToKeplerianElements(
                 finalPropagatedState, bodyMap_[ centralBody_ ]->getGravityFieldModel()->getGravitationalParameter() );
 
     // Convert targeted final state to MEE.
-    Eigen::Vector6d finalTargetedMEEstate = orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
+    Eigen::Vector6d finalTargetedMEEstate = orbital_element_conversions::convertCartesianToKeplerianElements(
                 stateAtArrival_, bodyMap_[ centralBody_ ]->getGravityFieldModel()->getGravitationalParameter() );
 
+    Eigen::Vector6d error = (finalPropagatedMEEstate - finalTargetedMEEstate).cwiseAbs();
 
     // Fitness
-    double deltaV = currentLeg.getTotalDeltaV( );
-
-    // Equality constraints (must be ... = 0 )
-    std::vector< double > equalityConstraints;
+    // double deltaV = currentLeg.getTotalDeltaV( );
+    //
+    // // Equality constraints (must be ... = 0 )
+    // std::vector< double > equalityConstraints;
 
     // Differences in MEE at arrival.
-    equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::semiParameterIndex ]
-                                   - finalTargetedMEEstate[ orbital_element_conversions::semiParameterIndex ] ) );
-    equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::fElementIndex ]
-                                   - finalTargetedMEEstate[ orbital_element_conversions::fElementIndex ] ) );
-    equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::gElementIndex ]
-                                   - finalTargetedMEEstate[ orbital_element_conversions::gElementIndex ] ) );
-    equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::hElementIndex ]
-                                   - finalTargetedMEEstate[ orbital_element_conversions::hElementIndex ] ) );
-    equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::kElementIndex ]
-                                   - finalTargetedMEEstate[ orbital_element_conversions::kElementIndex ] ) );
+    // equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::semiParameterIndex ]
+    //                                - finalTargetedMEEstate[ orbital_element_conversions::semiParameterIndex ] ) );
+    // equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::fElementIndex ]
+    //                                - finalTargetedMEEstate[ orbital_element_conversions::fElementIndex ] ) );
+    // equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::gElementIndex ]
+    //                                - finalTargetedMEEstate[ orbital_element_conversions::gElementIndex ] ) );
+    // equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::hElementIndex ]
+    //                                - finalTargetedMEEstate[ orbital_element_conversions::hElementIndex ] ) );
+    // equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::kElementIndex ]
+    //                                - finalTargetedMEEstate[ orbital_element_conversions::kElementIndex ] ) );
+    // equalityConstraints.push_back( std::fabs( finalPropagatedMEEstate[ orbital_element_conversions::TrueLong ]
+    //                                           - finalTargetedMEEstate[ orbital_element_conversions::kElementIndex ] ) );
+
+
 
     // Compute auxiliary variables.
     Eigen::Vector6d c;
     Eigen::Vector6d r;
     Eigen::Vector6d epsilon;
+    Eigen::Vector6d epsilon_lower;
+    Eigen::Vector6d epsilon_upper;
+
+    Eigen::Vector6d constraint_weights;
+    constraint_weights << 1.0, 1.0, 1.0, 0.0, 0.0, 0.0;
+
+    epsilon_lower = Eigen::Vector6d::Zero();
+    epsilon_upper << 100.0e3, 0.01, 0.1 * mathematical_constants::PI/180.0, 1.0 * mathematical_constants::PI/180.0, 1.0 * mathematical_constants::PI/180.0, 1.0 * mathematical_constants::PI/180.0;
+
+
     for ( int i = 0 ; i < 6 ; i++ )
     {
-        c[ i ] = 1.0 / relativeToleranceConstraints_;
-        r[ i ] = 1.0 - relativeToleranceConstraints_ * c[ i ];
-        epsilon[ i ] = equalityConstraints[ i ] * c[ i ] + r[ i ];
+        c[ i ] = 1.0 / (epsilon_upper(i) - epsilon_lower(i));
+        r[ i ] = 1.0 - epsilon_upper(i) * c[ i ];
+        epsilon[ i ] = error[ i ] * c[ i ] + r[ i ];
     }
 
-    double weightDeltaV = 1.0;
-    double weightConstraints = 10.0;
-    double optimisationObjective =  weightDeltaV * deltaV + weightConstraints * ( epsilon.norm( ) * epsilon.norm( ) );
+    double epsilon_final = 0.0;
 
+    for ( int i = 0 ; i < 6 ; i++) {
+        epsilon_final += constraint_weights[i] * epsilon[i] * epsilon[i];
+    }
 
+    std::cout << "err: " << error.transpose() << std::endl;
+    std::cout << "eps: " << epsilon.transpose() << std::endl;
+
+    // double weightDeltaV = 1000.0;
+    double weightDeltaV = 0.0;
+    // double weightConstraints = 10.0;
+    // double optimisationObjective =  weightDeltaV * deltaV + weightConstraints * ( epsilon.norm( ) * epsilon.norm( ) );
+    double optimisationObjective =  weightDeltaV * (1 - currentLeg.getMassAtTimeOfFlight()/initialSpacecraftMass_) + epsilon_final;
+
+    // std::cout << epsilon_final << std::endl;
     // Output of the fitness function..
     fitness.push_back( optimisationObjective );
 

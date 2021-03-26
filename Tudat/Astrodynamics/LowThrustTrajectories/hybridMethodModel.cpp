@@ -94,46 +94,35 @@ basic_astrodynamics::AccelerationMap HybridMethodModel::getLowThrustTrajectoryAc
 //! Propagate the spacecraft trajectory to time-of-flight.
 Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
 {
-    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
+    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_, integratorSettings_ ).first;
     return propagatedState;
 }
 
 
 
 //! Propagate the spacecraft trajectory to a given time.
-std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass )
+std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass, std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
     // Re-initialise integrator settings.
     integratorSettings_->initialTime_ = initialTime;
 
     bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass );
 
+    // === CUSTOM TEST THRUST!  ===
+    std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > colinearThrustDirectionGuidanceSettings =
+            std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
+    std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > constantThrustMagnitudeSettings =
+            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
+    std::shared_ptr< simulation_setup::AccelerationSettings > constantThrustAccelerationSettings = std::make_shared< simulation_setup::ThrustAccelerationSettings >( colinearThrustDirectionGuidanceSettings, constantThrustMagnitudeSettings );
+
     // Acceleration from the central body.
     std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > bodyToPropagateAccelerations;
     bodyToPropagateAccelerations[ centralBody_ ].push_back( std::make_shared< simulation_setup::AccelerationSettings >(
                                                                 basic_astrodynamics::central_gravity ) );
-//    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
+    // bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
+    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( constantThrustAccelerationSettings );
 
-    // === CUSTOM TEST THRUST!  ===
-//    /*
-//    double thrustMagnitude = 1.0;
-//    double specificImpulse = 2000.0;
-
-//    const Eigen::Vector3d bodyFixedThrustDirection = -1 * Eigen::Vector3d::UnitX( );
-//    std::cout << "bodyFixedThrustDirection: [" << bodyFixedThrustDirection[0] << ", " << bodyFixedThrustDirection[1] << ", " << bodyFixedThrustDirection[2] << "]" << std::endl;
-
-
-    std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
-            std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
-    std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings =
-            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
-
-    // Define acceleration model settings.
-    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back(
-            std::make_shared< simulation_setup::ThrustAccelerationSettings >( thrustDirectionGuidanceSettings, thrustMagnitudeSettings ) );
-//    */
-
-    simulation_setup::SelectedAccelerationMap accelerationMap;
+        simulation_setup::SelectedAccelerationMap accelerationMap;
     accelerationMap[ bodyToPropagate_ ] = bodyToPropagateAccelerations;
 
     // Create the acceleration map.
@@ -181,28 +170,46 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
         std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
                 dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
 
-        double propagationResultTime = numericalSolution.rbegin( )->first;
-        Eigen::VectorXd propagationResult = numericalSolution.at(propagationResultTime);
+        // std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > dependentVariableHistory = dynamicsSimulator.getDependentVariableHistory();
+
+        // double propagationResultTime = numericalSolution.rbegin( )->first;
+        // Eigen::VectorXd propagationResult = numericalSolution.at(propagationResultTime);
 
         //TODO SEE WHAT HAPPENS
 //        std::cout << " -- computeStateDerivative t: " << propagationResultTime << " -> \n " << propagationResult << std::endl;
 
-        double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
+        // double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
 
-        Eigen::Vector6d propagatedMEEState = propagationResult.segment(0, 6);
-        Eigen::Vector6d computedCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(propagatedMEEState, gravitationalParameter, false);
-
-
-        // Find the state derivatives at t_f
-        Eigen::VectorXd currentStateDerivative;
-        double currentTime = numericalSolution.cbegin( )->first;
-        currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
-                currentTime, numericalSolution.at(currentTime));
+        // std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
+        //         dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
+        //
+        // double propagationResultTime = numericalSolution.rbegin( )->first;
+//         Eigen::VectorXd propagationResult = numericalSolution.at(propagationResultTime);
+//
+//         //TODO SEE WHAT HAPPENS
+// //        std::cout << " -- computeStateDerivative t: " << propagationResultTime << " -> \n " << propagationResult << std::endl;
+//
+//         double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
+//
+//         Eigen::Vector6d propagatedMEEState = propagationResult.segment(0, 6);
+//         Eigen::Vector6d computedCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(propagatedMEEState, gravitationalParameter, false);
+//
+//
+//         // Find the state derivatives at t_f
+//         Eigen::VectorXd currentStateDerivative;
+//         double currentTime = numericalSolution.cbegin( )->first;
+//         currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
+//                 currentTime, numericalSolution.at(currentTime));
 
         //        currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
 //                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
+        Eigen::VectorXd propagationOriginalResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( ).rbegin( )->second;
 
-        Eigen::Vector6d computedMMEStateDerivatives = currentStateDerivative.segment(0, 6);
+
+        // Retrieve state and mass of the spacecraft at the end of the propagation.
+        Eigen::Vector6d propagatedState = propagationOriginalResult.segment( 0, 6 );
+        // Eigen::Vector6d computedMMEStateDerivatives = currentStateDerivative.segment(0, 6);
+        Eigen::Vector6d computedMMEStateDerivatives;
 //
 //        std::cout << "-- computedMMEStateDerivatives -- \n" << computedMMEStateDerivatives << std::endl;
 //        std::cout << "-- computedCartesianState -- \n" << computedCartesianState << std::endl;
@@ -210,106 +217,12 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
     // Retrieve state and mass of the spacecraft at the end of the propagation.
     if ( finalTime == timeOfFlight_ )
     {
-        massAtTimeOfFlight_ = propagationResult[ 6 ];
+        massAtTimeOfFlight_ = propagationOriginalResult[ 6 ];
     }
 
-    return std::pair<Eigen::Vector6d, Eigen::Vector6d> (computedCartesianState, computedMMEStateDerivatives);
+    return std::pair<Eigen::Vector6d, Eigen::Vector6d> (propagatedState, computedMMEStateDerivatives);
 }
 
-
-    std::pair< double, Eigen::Vector6d > HybridMethodModel::computeAverages(const Eigen::Vector6d& fromCartesianState, const double fromTime, int numberOfSteps, double averagingTime )    {
-        // Initialise propagated state.
-        Eigen::Vector6d propagatedState = fromCartesianState;
-
-        // std::vector<Eigen::Vector6d> propagationResult;
-        std::vector<Eigen::Vector6d> stateDerivatives;
-
-        // Generate Epochs for Theta
-        std::vector< double > thetaEpochs;
-        double deltaTheta = (2.0 * mathematical_constants::PI) / numberOfSteps;
-
-        for ( int i = 0 ; i <= numberOfSteps ; i++ )
-        {
-            thetaEpochs.push_back( deltaTheta * i );
-        }
-
-        // Initialise mass of the spacecraft at departure.
-//        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialSpacecraftMass_ );
-//        double currentMass = initialSpacecraftMass_;
-
-        double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
-
-        // Temp Debug print
-        Eigen::Vector6d keplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState,
-                                                                                                         gravitationalParameter);
-        // std::cout << "-- Keplerian Elements -- \n " << keplerianState << std::endl;
-
-        // Convert from theta to time (container vector)
-        std::vector< double > timeEpochs;
-
-        double currentTime = fromTime;
-        // Does this work to initialize the state derivatives?
-        // double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
-//        propagationResult = propagateTrajectory( currentTime, currentTime, propagatedState, currentMass );
-//        stateDerivatives.push_back(propagationResult[1]);
-
-        for ( int epochIndex = 0 ; epochIndex < thetaEpochs.size( ) ; epochIndex++ )
-        {
-            // Convert theta to time
-            double a = orbital_element_conversions::convertCartesianToKeplerianElements(propagatedState, gravitationalParameter)[0];
-            double r = propagatedState.segment(0 ,3 ).norm();
-
-            double deltaTime = deltaTheta * (r / (a * std::sqrt(gravitationalParameter / std::pow(a, 3.0))));
-
-            // Propagate to t + dt
-            double currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
-
-            std::pair<Eigen::Vector6d, Eigen::Vector6d> propagationResult = propagateTrajectory( currentTime, currentTime + deltaTime, propagatedState, currentMass );
-
-            // Update State Derivative result vector
-            timeEpochs.push_back(currentTime);
-            stateDerivatives.push_back(propagationResult.second);
-
-            // Update States
-            propagatedState = propagationResult.first;
-            currentTime += deltaTime;
-        }
-
-//        std::cout << "thetaEpochs:\n" << thetaEpochs << std::endl;
-
-//        double orbitPeriod = currentTime;
-
-//        bodyMap_[ centralBody_ ]->setConstantBodyMass( initialSpacecraftMass_ );
-
-        // Create Trapezoidal Quadrature Integrator
-        tudat::numerical_quadrature::TrapezoidNumericalQuadrature< double, Eigen::Vector6d > integrator(
-                timeEpochs, stateDerivatives );
-        Eigen::Vector6d computedIntegralTrapezoid = integrator.getQuadrature();
-
-        Eigen::Vector6d averageStateProgression = computedIntegralTrapezoid / (currentTime - fromTime);
-
-        Eigen::Vector6d propagatedMEEState = orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(propagatedState, gravitationalParameter, false);
-
-        double finalOAtime = fromTime + averagingTime;
-
-        Eigen::Vector6d toMEEState = propagatedMEEState + (averageStateProgression * (finalOAtime - currentTime));
-
-        Eigen::Vector6d toCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(toMEEState, gravitationalParameter, false);
-
-        std::pair< double, Eigen::Vector6d > finalOAState(finalOAtime, toCartesianState);
-        //
-        // std::cout << "n_stateDerivatives: " << stateDerivatives.size() << std::endl;
-        // std::cout << "Computed T_orb: " << orbitTime << std::endl;
-        // std::cout << "-- Trapezoidal Integral: \n" << computedIntegralTrapezoid << std::endl;
-        // std::cout << "-- averageStateProgression: \n" << averageStateProgression << std::endl;
-        // std::cout << "-- fromState: \n" << propagatedMEEState << std::endl;
-        // std::cout << "-- toState: \n" << toMEEState << std::endl;
-        // std::cout << "-- toCartesianState: \n" << toCartesianState << std::endl;
-
-        std::cout << "t0: " << fromTime/physical_constants::JULIAN_DAY << ", tf: " << finalOAtime/physical_constants::JULIAN_DAY << std::endl;
-
-        return finalOAState;
-    }
 //! Propagate the trajectory to set of epochs.
 std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         std::vector< double > epochs, std::map< double, Eigen::Vector6d >& propagatedTrajectory )
@@ -344,14 +257,14 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         {
             if ( currentTime > 0.0 )
             {
-                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass ).first;
+                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass, integratorSettings_ ).first;
                 currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
             }
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
         else
         {
-            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass ).first;
+            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass, integratorSettings_ ).first;
             currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
@@ -367,39 +280,40 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
 //! Return the deltaV associated with the thrust profile of the trajectory.
 double HybridMethodModel::computeDeltaV( )
 {
+    // Compute deltaV analytically.
+    return specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION
+                     * std::log( initialSpacecraftMass_ / massAtTimeOfFlight_);
 
     // Compute (constant) mass rate.
-    double massRate = - maximumThrust_ /
-            ( specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION );
-
-    // Compute time during which the engine was switched on.
-    double engineSwitchedOnDuration = ( massAtTimeOfFlight_ - initialSpacecraftMass_ ) / massRate;
-
-    std::shared_ptr< numerical_quadrature::QuadratureSettings< double > > quadratureSettings_ =
-            std::make_shared< numerical_quadrature::GaussianQuadratureSettings < double > >( 0.0, 16 );
-
-    // Thrust acceleration function to use quadrature.
-    // Define thrust acceleration as a function of time (to be integrated to compute the associated deltaV).
-    std::function< double( const double ) > thrustAcceleration = [ = ] ( const double currentTime ){
-
-        // Compute current mass.
-        double currentMass = initialSpacecraftMass_ + massRate * currentTime;
-
-        // Compute and return current thrust acceleration.
-        double currentThrustAcceleration = maximumThrust_ / currentMass;
-
-        return currentThrustAcceleration;
-    };
-
-    // Create numerical quadrature from quadrature settings.
-    std::shared_ptr< numerical_quadrature::NumericalQuadrature< double, double > > quadrature =
-            numerical_quadrature::createQuadrature( thrustAcceleration, quadratureSettings_, engineSwitchedOnDuration );
-
-    // Compute deltaV analytically.
-    double deltaV = - specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION
-            * std::log( 1.0 + massRate / initialSpacecraftMass_ * engineSwitchedOnDuration );
-
-    return deltaV;
+    // double massRate = - maximumThrust_ /
+    //         ( specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION );
+    //
+    // // Compute time during which the engine was switched on.
+    // double engineSwitchedOnDuration = ( massAtTimeOfFlight_ - initialSpacecraftMass_ ) / massRate;
+    //
+    // std::shared_ptr< numerical_quadrature::QuadratureSettings< double > > quadratureSettings_ =
+    //         std::make_shared< numerical_quadrature::GaussianQuadratureSettings < double > >( 0.0, 16 );
+    //
+    // // Thrust acceleration function to use quadrature.
+    // // Define thrust acceleration as a function of time (to be integrated to compute the associated deltaV).
+    // std::function< double( const double ) > thrustAcceleration = [ = ] ( const double currentTime ){
+    //
+    //     // Compute current mass.
+    //     double currentMass = initialSpacecraftMass_ + massRate * currentTime;
+    //
+    //     // Compute and return current thrust acceleration.
+    //     double currentThrustAcceleration = maximumThrust_ / currentMass;
+    //
+    //     return currentThrustAcceleration;
+    // };
+    //
+    // // Create numerical quadrature from quadrature settings.
+    // std::shared_ptr< numerical_quadrature::NumericalQuadrature< double, double > > quadrature =
+    //         numerical_quadrature::createQuadrature( thrustAcceleration, quadratureSettings_, engineSwitchedOnDuration );
+    //
+    // // Compute deltaV analytically.
+    // double deltaV = - specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION
+    //         * std::log( 1.0 + massRate / initialSpacecraftMass_ * engineSwitchedOnDuration );
 }
 
 

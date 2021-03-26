@@ -69,10 +69,10 @@ Eigen::Vector3d getForceDirectionColinearWithVelocity(
     Eigen::Vector3d currentVelocity = currentState.segment(3,3);
 
     // Positive out-of-plane thrust for v_z > 0, negative for v_z < 0
-    return currentPosition.cross(currentVelocity).normalized() * (currentVelocity[2] > 0 ? 1 : -1);
+    // return currentPosition.cross(currentVelocity).normalized() * (currentVelocity[2] > 0 ? 1 : -1);
 
 
-   // return ( ( putForceInOppositeDirection == 1 ) ? -1.0 : 1.0 ) * ( currentState.segment( 3, 3 ) ).normalized( );
+   return ( ( putForceInOppositeDirection == 1 ) ? -1.0 : 1.0 ) * ( currentState.segment( 3, 3 ) ).normalized( );
 }
 
 //! Function to get the unit vector colinear with position segment of a translational state.

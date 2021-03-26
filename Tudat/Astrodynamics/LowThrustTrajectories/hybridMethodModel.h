@@ -89,7 +89,7 @@ public:
     Eigen::Vector6d propagateTrajectory( );
 
     //! Propagate the spacecraft trajectory to a given time.
-    std::pair<Eigen::Vector6d, Eigen::Vector6d> propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass );
+    std::pair<Eigen::Vector6d, Eigen::Vector6d> propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass, std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings );
 
     //! Propagate the trajectory to set of epochs as a function of theta.
     std::pair< double, Eigen::Vector6d > computeAverages(const Eigen::Vector6d& currentState, double currentTime, int numberOfSteps, double averagingTime );

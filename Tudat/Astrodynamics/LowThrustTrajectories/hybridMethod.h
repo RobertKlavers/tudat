@@ -66,7 +66,7 @@ public:
             }
             else
             {
-                //Eigen::VectorXd initialGuessMEEinitialAndFinalCostates( 10 ); // No entirely sure why this is needed
+                Eigen::VectorXd initialGuessMEEinitialAndFinalCostates( 10 ); // No entirely sure why this is needed
                 initialGuessThrustModel_.first = optimisationSettings_->initialGuessThrustModel_.first;
             }
         }
@@ -76,20 +76,20 @@ public:
         }
         initialGuessThrustModel_.second = optimisationSettings_->initialGuessThrustModel_.second;
 
-//        // Perform optimisation
-//        std::pair< std::vector< double >, std::vector< double > > bestIndividual = performOptimisation( );
-//        championFitness_ = bestIndividual.first;
-//        championDesignVariables_ = bestIndividual.second;
-//
-//
-//        // Transform vector of design variables into 3D vector of throttles.
+       // Perform optimisation
+       std::pair< std::vector< double >, std::vector< double > > bestIndividual = performOptimisation( );
+       championFitness_ = bestIndividual.first;
+       championDesignVariables_ = bestIndividual.second;
+
+
+       // Transform vector of design variables into 3D vector of throttles.
         Eigen::VectorXd initialCostates; initialCostates.resize( 5 );
         Eigen::VectorXd finalCostates; finalCostates.resize( 5 );
-//        for ( unsigned int i = 0 ; i < 5 ; i++ )
-//        {
-//            initialCostates[ i ] = championDesignVariables_[ i ];
-//            finalCostates[ i ] = championDesignVariables_[ i + 5 ];
-//        }
+       for ( unsigned int i = 0 ; i < 5 ; i++ )
+       {
+           initialCostates[ i ] = championDesignVariables_[ i ];
+           finalCostates[ i ] = championDesignVariables_[ i + 5 ];
+       }
 
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass_ );
 
@@ -241,6 +241,7 @@ private:
 
     //! Lower and upper bounds for the initial and final MEE costates.
     std::pair< double, double > initialAndFinalMEEcostatesBounds_;
+
 
 };
 
