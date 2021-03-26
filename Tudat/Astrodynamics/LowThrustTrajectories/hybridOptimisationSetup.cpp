@@ -75,20 +75,20 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethodProblem::g
 
     if ( guessInitialAndFinalCostates_.size( ) != 0 )
     {
-        if ( guessInitialAndFinalCostates_.size() != 10 )
+        if ( guessInitialAndFinalCostates_.size() != 12 )
         {
             throw std::runtime_error( "Error when providing an initial guess for hybrid method, size of the vector unconsistent"
                                       "with the expected 5 initial and 5 final MEE costate values." );
         }
         else
         {
-            for ( int i = 0 ; i < 10 ; i++ )
+            for ( int i = 0 ; i < 12 ; i++ )
             {
                 double lowerBoundsFromInitialGuess = ( 1.0 - relativeMarginWrtInitialGuess_ ) * guessInitialAndFinalCostates_[ i ];
                 lowerBounds.push_back( lowerBoundsFromInitialGuess );
             }
 
-            for ( int i = 0 ; i < 10 ; i++ )
+            for ( int i = 0 ; i < 12 ; i++ )
             {
                 double upperBoundsFromInitialGuess = ( 1.0 + relativeMarginWrtInitialGuess_ ) * guessInitialAndFinalCostates_[ i ];
                 upperBounds.push_back( upperBoundsFromInitialGuess );
@@ -97,7 +97,7 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethodProblem::g
     }
     else
     {
-        for ( int i = 0 ; i < 10 ; i ++ )
+        for ( int i = 0 ; i < 12 ; i ++ )
         {
             lowerBounds.push_back( initialAndFinalMEEcostatesBounds_.first );
             upperBounds.push_back( initialAndFinalMEEcostatesBounds_.second );

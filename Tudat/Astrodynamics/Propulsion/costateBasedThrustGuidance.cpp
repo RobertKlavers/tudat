@@ -90,6 +90,8 @@ void MeeCostateBasedThrustGuidance::updateForceDirection( const double time )
         // since both denominators are the same.
         double thrustAngleBeta = std::atan2( Lbf3 - Lbg3 - Lbh - Lbk, - Lbp - Lbf1 - Lbf2 + Lbg1 - Lbg2 );
 
+
+
         // Calculate thrust direction
         currentForceDirection_ = reference_frames::getVelocityBasedLvlhToInertialRotation(
                     currentState, Eigen::Vector6d::Zero( ), false ) *

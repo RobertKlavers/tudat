@@ -74,5 +74,9 @@ if( USE_PAGMO )
     setup_custom_test_program(test_HybridMethod "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}")
     target_link_libraries(test_HybridMethod tudat_low_thrust_trajectories tudat_numerical_quadrature pagmo ${TUDAT_PROPAGATION_LIBRARIES}  ${Boost_LIBRARIES})
 
+    add_executable(test_AverageStep "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}/UnitTests/unitTestAverageStep.cpp")
+    setup_custom_test_program(test_AverageStep "${SRCROOT}${LOWTHRUSTTRAJECTORIESDIR}")
+    target_link_libraries(test_AverageStep tudat_low_thrust_trajectories tudat_numerical_quadrature pagmo ${TUDAT_PROPAGATION_LIBRARIES}  ${Boost_LIBRARIES})
+
     message("Enabled test_HybridMethod")
 endif( )

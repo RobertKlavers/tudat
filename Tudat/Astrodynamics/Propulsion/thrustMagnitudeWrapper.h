@@ -297,6 +297,8 @@ public:
                     //costates_[ orbital_element_conversions::fElementIndex ] * ( ( w1 + 1.0 ) * std::cos( L ) + f ) / w1;
             double lambdag2 = costates_[ orbital_element_conversions::gElementIndex ] / w1 * ( ( w1 + 1.0 ) * std::sin( L ) + g );
 
+
+
             // Compute sinus of the optimal value of angle alpha.
             double sinOptimalAlpha = - ( lambdaf1 - lambdag1 ) /
                     std::sqrt( ( lambdaf1 - lambdag1 ) * ( lambdaf1 - lambdag1 ) +
@@ -330,27 +332,29 @@ public:
                                + ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 )
                                * ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 ) );
 
+            double lambdam = costates_[5];
 
             // Switching function for the thrust magnitude.
             double thrustMagnitudeSwitchingCondition = ( 1.0 / thrustingBodyMassFunction_( ) ) *
                     ( lambdap * cosOptimalBeta + lambdah * sinOptimalBeta + lambdak * sinOptimalBeta
                     + lambdaf1 * cosOptimalBeta + lambdaf2 * cosOptimalBeta - lambdaf3 * sinOptimalBeta
-                    - lambdag1 * cosOptimalBeta + lambdag2 * cosOptimalBeta + lambdag3 * sinOptimalBeta );
+                    - lambdag1 * cosOptimalBeta + lambdag2 * cosOptimalBeta + lambdag3 * sinOptimalBeta )
+                    - lambdam * 1.0/(currentSpecificImpulse_ * centralBodyGravitationalParameter);
 
 
             // Compute current thrust magnitude and specific impulse.
             if ( thrustMagnitudeSwitchingCondition <= 0.0 )
             {
-//                std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST ON. " << "\n\n";
+               std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST ON. " << "\n";
                 currentThrustMagnitude_ = maximumThrustMagnitude_;
-                currentSpecificImpulse_ = specificImpulseFunction_( time );
             }
             else
             {
-//                std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST OFF. " << "\n\n";
+               std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST OFF. " << "\n";
                 currentThrustMagnitude_ = 0.0;
-                currentSpecificImpulse_ = specificImpulseFunction_( time );
+
             }
+            currentSpecificImpulse_ = specificImpulseFunction_( time );
 
             currentTime_ = time;
         }

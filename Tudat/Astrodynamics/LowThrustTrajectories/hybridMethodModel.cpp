@@ -108,21 +108,21 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
 
     bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass );
 
-    // === CUSTOM TEST THRUST!  ===
-    std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > colinearThrustDirectionGuidanceSettings =
-            std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
-    std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > constantThrustMagnitudeSettings =
-            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
-    std::shared_ptr< simulation_setup::AccelerationSettings > constantThrustAccelerationSettings = std::make_shared< simulation_setup::ThrustAccelerationSettings >( colinearThrustDirectionGuidanceSettings, constantThrustMagnitudeSettings );
+    // // === CUSTOM TEST THRUST!  ===
+    // std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > colinearThrustDirectionGuidanceSettings =
+    //         std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
+    // std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > constantThrustMagnitudeSettings =
+    //         std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
+    // std::shared_ptr< simulation_setup::AccelerationSettings > constantThrustAccelerationSettings = std::make_shared< simulation_setup::ThrustAccelerationSettings >( colinearThrustDirectionGuidanceSettings, constantThrustMagnitudeSettings );
 
     // Acceleration from the central body.
     std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > bodyToPropagateAccelerations;
     bodyToPropagateAccelerations[ centralBody_ ].push_back( std::make_shared< simulation_setup::AccelerationSettings >(
                                                                 basic_astrodynamics::central_gravity ) );
-    // bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
-    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( constantThrustAccelerationSettings );
+    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
+    // bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( constantThrustAccelerationSettings );
 
-        simulation_setup::SelectedAccelerationMap accelerationMap;
+    simulation_setup::SelectedAccelerationMap accelerationMap;
     accelerationMap[ bodyToPropagate_ ] = bodyToPropagateAccelerations;
 
     // Create the acceleration map.

@@ -1860,7 +1860,7 @@ BOOST_AUTO_TEST_CASE( testMeeCostateBasedThrust )
         std::shared_ptr< TranslationalStatePropagatorSettings< double > > translationalPropagatorSettings =
                 std::make_shared< TranslationalStatePropagatorSettings< double > >
                 ( centralBodies, accelerationModelMap, bodiesToPropagate, systemInitialState,
-                  std::make_shared< propagators::PropagationTimeTerminationSettings >( simulationEndEpoch ), cowell,
+                  std::make_shared< propagators::PropagationTimeTerminationSettings >( simulationEndEpoch ), gauss_modified_equinoctial,
                   std::make_shared< DependentVariableSaveSettings >( dependentVariables ) );
         std::map< std::string, std::shared_ptr< basic_astrodynamics::MassRateModel > > massRateModels;
         massRateModels[ "Asterix" ] = createMassRateModel(

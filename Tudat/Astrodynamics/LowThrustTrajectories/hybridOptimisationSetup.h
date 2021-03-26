@@ -49,7 +49,7 @@ struct HybridMethodProblem
                          const std::string centralBody,
                          std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
                          const std::pair< std::vector< double >, double > initialGuessThrustModel,
-                         const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 10.0, 10.0 ),
+                         const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 10000.0, 10000.0 ),
                          const double relativeToleranceConstraints = 1.0e-6 );
 
     //! Calculate the fitness as a function of the parameter vector x

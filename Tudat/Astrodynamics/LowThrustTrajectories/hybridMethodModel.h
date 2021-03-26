@@ -56,10 +56,10 @@ public:
         // Define function returning the current MEE costates.
         costatesFunction_ = [ = ]( const double currentTime )
         {
-            Eigen::VectorXd currentCostates;
-            currentCostates.resize( 5 );
+            Eigen::VectorXd currentCostates(initialCoStates.size());
+            // currentCostates.resize( 6 );
 
-            for ( int i = 0 ; i < 5 ; i++ )
+            for ( int i = 0 ; i < 6 ; i++ )
             {
                 currentCostates[ i ] = initialCoStates_[ i ]
                         + ( currentTime / timeOfFlight_ ) * ( finalCoStates_[ i ] - initialCoStates_[ i ] );
