@@ -345,12 +345,12 @@ public:
             // Compute current thrust magnitude and specific impulse.
             if ( thrustMagnitudeSwitchingCondition <= 0.0 )
             {
-               std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST ON. " << "\n";
+               // std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST ON. " << "\n";
                 currentThrustMagnitude_ = maximumThrustMagnitude_;
             }
             else
             {
-               std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST OFF. " << "\n";
+               // std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST OFF. " << "\n";
                 currentThrustMagnitude_ = 0.0;
 
             }

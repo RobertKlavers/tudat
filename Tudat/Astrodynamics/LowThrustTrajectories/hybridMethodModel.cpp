@@ -108,6 +108,8 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
 
     bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass );
 
+    std::cout << "t0: " << initialTime << ", tf: " << finalTime << std::endl;
+
     // // === CUSTOM TEST THRUST!  ===
     // std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > colinearThrustDirectionGuidanceSettings =
     //         std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
@@ -139,6 +141,20 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
     std::shared_ptr< propagators::PropagationTimeTerminationSettings > terminationSettings
             = std::make_shared< propagators::PropagationTimeTerminationSettings >( finalTime, true );
 
+    std::vector<std::shared_ptr<propagators::SingleDependentVariableSaveSettings> > dependentVariablesList;
+    dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
+            propagators::keplerian_state_dependent_variable, bodyToPropagate_, centralBody_ ) );
+
+    dependentVariablesList.push_back(std::make_shared<propagators::SingleAccelerationDependentVariableSaveSettings>(
+            basic_astrodynamics::thrust_acceleration, bodyToPropagate_, bodyToPropagate_, 0));
+    dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
+            propagators::lvlh_to_inertial_frame_rotation_dependent_variable, bodyToPropagate_, centralBody_ ) );
+    // dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
+    //         propagators::rotation_matrix_to_body_fixed_frame_variable, "Vehicle", "Earth" ) );
+    std::shared_ptr<propagators::DependentVariableSaveSettings> dependentVariablesToSave =
+            std::make_shared<propagators::DependentVariableSaveSettings>(dependentVariablesList);
+
+    int thrustIndex = 6;
 
         // Define propagator settings.
         std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > > translationalStatePropagatorSettings =
@@ -160,7 +176,7 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
 
         // Hybrid propagation settings.
         std::shared_ptr< propagators::PropagatorSettings< double > > propagatorSettings =
-                std::make_shared< propagators::MultiTypePropagatorSettings< double > >( propagatorSettingsVector, terminationSettings );
+                std::make_shared< propagators::MultiTypePropagatorSettings< double > >( propagatorSettingsVector, terminationSettings, dependentVariablesToSave );
 
         integratorSettings_->initialTime_ = initialTime;
 
@@ -169,6 +185,41 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
 
         std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
                 dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
+
+
+    std::map< double, Eigen::VectorXd > integrationResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( );
+    std::map< double, Eigen::VectorXd > dependentVariableResult = dynamicsSimulator.getDependentVariableHistory( );
+    // Manually add thrust force in LVLH frame to output
+    for( std::map< double, Eigen::VectorXd >::iterator outputIterator = dependentVariableResult.begin( );
+         outputIterator != dependentVariableResult.end( ); outputIterator++ )
+    {
+        Eigen::Matrix3d currentRotationMatrix =
+                propagators::getMatrixFromVectorRotationRepresentation( outputIterator->second.segment( thrustIndex+3, 9 ) );
+        Eigen::Vector3d currentThrust = outputIterator->second.segment( thrustIndex+0, 3 );
+        Eigen::VectorXd newOutput = Eigen::VectorXd( thrustIndex+15 );
+        newOutput.segment( 0, thrustIndex+12 ) = outputIterator->second;
+        newOutput.segment( thrustIndex+12, 3 ) =
+                integrationResult.at( outputIterator->first )( 6 ) *
+                ( currentRotationMatrix.transpose( ) * currentThrust );
+        dependentVariableResult[ outputIterator->first ] = newOutput;
+    }
+
+        //Temporary stuff to directly store the dependent variable history (hopefully containing thrust acceleration profile)
+        std::cout << "Exporting Dependent Variable History!!" << std::endl;
+        input_output::writeDataMapToTextFile( dependentVariableResult,
+                                "thrustTestdependentVariableHistory.dat",
+                                "/home/robert/Temp",
+                                "",
+                                std::numeric_limits< double >::digits10,
+                                std::numeric_limits< double >::digits10,
+                                "," );
+        input_output::writeDataMapToTextFile( integrationResult,
+                                          "thrustTestIntegrationResult.dat",
+                                          "/home/robert/Temp",
+                                          "",
+                                          std::numeric_limits< double >::digits10,
+                                          std::numeric_limits< double >::digits10,
+                                          "," );
 
         // std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > dependentVariableHistory = dynamicsSimulator.getDependentVariableHistory();
 
