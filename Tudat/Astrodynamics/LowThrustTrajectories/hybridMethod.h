@@ -43,7 +43,7 @@ public:
             const std::string centralBody,
             std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
             std::shared_ptr< simulation_setup::OptimisationSettings > optimisationSettings,
-            const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 10.0, 10.0 ) ):
+            const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 1.0e4, 1.0e4 ) ):
         LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, initialSpacecraftMass, true ),
         centralBodyGravitationalParameter_( centralBodyGravitationalParameter ),
         bodyMap_( bodyMap ),
@@ -59,14 +59,14 @@ public:
         // Convert the thrust model proposed as initial guess into simplified thrust model adapted to the hybrid method.
         if ( optimisationSettings_->initialGuessThrustModel_.first.size( ) != 0 )
         {
-            if ( optimisationSettings_->initialGuessThrustModel_.first.size( ) != 10 )
+            if ( optimisationSettings_->initialGuessThrustModel_.first.size( ) != 12 )
             {
                 throw std::runtime_error( "Error when providing an initial guess for hybrid method, vector size"
                                           "unconsistent with the 5 initial and 5 final MEE costate values which are required." );
             }
             else
             {
-                Eigen::VectorXd initialGuessMEEinitialAndFinalCostates( 10 ); // No entirely sure why this is needed
+                Eigen::VectorXd initialGuessMEEinitialAndFinalCostates( 12 ); // No entirely sure why this is needed
                 initialGuessThrustModel_.first = optimisationSettings_->initialGuessThrustModel_.first;
             }
         }
@@ -83,12 +83,12 @@ public:
 
 
        // Transform vector of design variables into 3D vector of throttles.
-        Eigen::VectorXd initialCostates; initialCostates.resize( 5 );
-        Eigen::VectorXd finalCostates; finalCostates.resize( 5 );
-       for ( unsigned int i = 0 ; i < 5 ; i++ )
+       Eigen::VectorXd initialCostates; initialCostates.resize( 6 );
+       Eigen::VectorXd finalCostates; finalCostates.resize( 6 );
+       for ( unsigned int i = 0 ; i < 6; i++ )
        {
            initialCostates[ i ] = championDesignVariables_[ i ];
-           finalCostates[ i ] = championDesignVariables_[ i + 5 ];
+           finalCostates[ i ] = championDesignVariables_[ i + 6 ];
        }
 
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass_ );

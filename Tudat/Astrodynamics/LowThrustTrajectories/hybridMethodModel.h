@@ -57,7 +57,7 @@ public:
         costatesFunction_ = [ = ]( const double currentTime )
         {
             Eigen::VectorXd currentCostates(initialCoStates.size());
-            // currentCostates.resize( 6 );
+            currentCostates.resize( 6 );
 
             for ( int i = 0 ; i < 6 ; i++ )
             {
@@ -85,11 +85,21 @@ public:
     //! Retrieve hybrid method acceleration model (including thrust and central gravity acceleration)
     basic_astrodynamics::AccelerationMap getLowThrustTrajectoryAccelerationMap( );
 
+    propagators::SingleArcDynamicsSimulator<> getDynamicsSimulator(
+            double initialTime,
+            double finalTime,
+            Eigen::Vector6d initialState,
+            double initialMass,
+            std::shared_ptr<numerical_integrators::IntegratorSettings < double>> integratorSettings,
+            bool withDependent = false);
+
+    std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> getTrajectoryOutput();
+
     //! Propagate the spacecraft trajectory to time of flight.
     Eigen::Vector6d propagateTrajectory( );
 
     //! Propagate the spacecraft trajectory to a given time.
-    std::pair<Eigen::Vector6d, Eigen::Vector6d> propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass, std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings );
+    std::pair<Eigen::Vector6d, Eigen::Vector6d> propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass);
 
     //! Propagate the trajectory to set of epochs as a function of theta.
     std::pair< double, Eigen::Vector6d > computeAverages(const Eigen::Vector6d& currentState, double currentTime, int numberOfSteps, double averagingTime );

@@ -28,19 +28,19 @@ namespace low_thrust_trajectories
 std::pair< std::vector< double >, std::vector< double > > HybridMethod::performOptimisation( )
 {
     //Set seed for reproducible results
-    pagmo::random_device::set_seed( 456 );
+    // pagmo::random_device::set_seed( 456 );
 
     // Create object to compute the problem fitness
     problem prob{ HybridMethodProblem( stateAtDeparture_, stateAtArrival_, maximumThrust_, specificImpulse_, timeOfFlight_, bodyMap_,
                                        bodyToPropagate_, centralBody_, integratorSettings_, initialGuessThrustModel_, initialAndFinalMEEcostatesBounds_,
                                        optimisationSettings_->relativeToleranceConstraints_ )};
 
-    std::vector< double > constraintsTolerance;
-    for ( unsigned int i = 0 ; i < ( prob.get_nec() + prob.get_nic() ) ; i++ )
-    {
-        constraintsTolerance.push_back( 1.0e-3 );
-    }
-    prob.set_c_tol( constraintsTolerance );
+    // std::vector< double > constraintsTolerance;
+    // for ( unsigned int i = 0 ; i < ( prob.get_nec() + prob.get_nic() ) ; i++ )
+    // {
+    //     constraintsTolerance.push_back( 1.0e-3 );
+    // }
+    // prob.set_c_tol( constraintsTolerance );
 
     algorithm algo = optimisationSettings_->optimisationAlgorithm_;
 
@@ -48,7 +48,9 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
 
     island island{ algo, prob, populationSize };
 
-    // Evolve for 10 generations
+
+
+    // // Evolve for N generations
     for( int i = 0 ; i < optimisationSettings_->numberOfGenerations_ ; i++ )
     {
         island.evolve( );
@@ -59,6 +61,13 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
         }
         island.wait_check( ); // Raises errors
 
+        std::cout << "gen: " << i << ", f: " << island.get_population().champion_f()[0] << std::endl;
+
+        std::vector<double> championDesignVector = island.get_population().champion_x();
+        for (int j = 0; j < 6; j++) {
+            std::cout << "[" << championDesignVector[j] << ", " << championDesignVector[j + 6] << "], ";
+        }
+        std::cout << "(" << championDesignVector.size() << ")" << std::endl;
     }
 
     championFitness_ = island.get_population().champion_f();
@@ -253,7 +262,7 @@ Eigen::Vector6d HybridMethod::computeCurrentStateVector( const double currentTim
     }
     else
     {
-        stateVector = hybridMethodModel_->propagateTrajectory( 0.0, currentTime, stateAtDeparture_, initialMass_, integratorSettings_).first;
+        stateVector = hybridMethodModel_->propagateTrajectory( 0.0, currentTime, stateAtDeparture_, initialMass_).first;
     }
 
     return stateVector;

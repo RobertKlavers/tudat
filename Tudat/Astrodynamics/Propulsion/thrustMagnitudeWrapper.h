@@ -335,11 +335,18 @@ public:
             double lambdam = costates_[5];
 
             // Switching function for the thrust magnitude.
-            double thrustMagnitudeSwitchingCondition = ( 1.0 / thrustingBodyMassFunction_( ) ) *
-                    ( lambdap * cosOptimalBeta + lambdah * sinOptimalBeta + lambdak * sinOptimalBeta
-                    + lambdaf1 * cosOptimalBeta + lambdaf2 * cosOptimalBeta - lambdaf3 * sinOptimalBeta
-                    - lambdag1 * cosOptimalBeta + lambdag2 * cosOptimalBeta + lambdag3 * sinOptimalBeta )
-                    - lambdam * 1.0/(currentSpecificImpulse_ * centralBodyGravitationalParameter);
+            double thrustMagnitudeSwitchingCondition = (1.0 / thrustingBodyMassFunction_()) *
+                                                       (lambdap * cosOptimalBeta +
+                                                        lambdah * sinOptimalBeta +
+                                                        lambdak * sinOptimalBeta +
+                                                        lambdaf1 * cosOptimalBeta +
+                                                        lambdaf2 * cosOptimalBeta -
+                                                        lambdaf3 * sinOptimalBeta -
+                                                        lambdag1 * cosOptimalBeta +
+                                                        lambdag2 * cosOptimalBeta +
+                                                        lambdag3 * sinOptimalBeta)
+                                                       - lambdam * 1.0 /
+                                                         (currentSpecificImpulse_ * centralBodyGravitationalParameter);
 
 
             // Compute current thrust magnitude and specific impulse.

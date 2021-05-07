@@ -88,16 +88,23 @@ void MeeCostateBasedThrustGuidance::updateForceDirection( const double time )
 
         // Calculate yaw angle, NOTE: denomitator ommitted since it is not relevant for the atan2 function,
         // since both denominators are the same.
-        double thrustAngleBeta = std::atan2( Lbf3 - Lbg3 - Lbh - Lbk, - Lbp - Lbf1 - Lbf2 + Lbg1 - Lbg2 );
+        double thrustAngleBeta = std::atan2(-(-Lbf3 + Lbg3 + Lbh + Lbk), -(Lbp + Lbf1 - Lbg1 + Lbf2  + Lbg2));
 
-
+        Eigen::Vector3d lvlhThrustDirection;
+        lvlhThrustDirection = (Eigen::Vector3d() <<
+                cos( thrustAngleAlpha ) * cos( thrustAngleBeta ),
+                sin( thrustAngleAlpha ) * cos( thrustAngleBeta ),
+                sin( thrustAngleBeta )).finished( ).normalized( );
 
         // Calculate thrust direction
         currentForceDirection_ = reference_frames::getVelocityBasedLvlhToInertialRotation(
-                    currentState, Eigen::Vector6d::Zero( ), false ) *
-                ( ( Eigen::Vector3d( ) <<
-                    cos( thrustAngleAlpha ) * cos( thrustAngleBeta ), sin( thrustAngleAlpha ) * cos( thrustAngleBeta ) ,
-                    sin( thrustAngleBeta )  ).finished( ).normalized( ) );
+                    currentState, Eigen::Vector6d::Zero( ), false ) * lvlhThrustDirection;
+
+        double rad2deg = 180/mathematical_constants::PI;
+        //
+        // std::cout << costates_.transpose() << std::endl;
+        // std::cout << "[" << lvlhThrustDirection.transpose() << "], (" << thrustAngleAlpha*rad2deg << ", " << thrustAngleBeta*rad2deg << ")" <<  std::endl;
+
         currentTime_ = time;
 
 

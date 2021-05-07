@@ -90,47 +90,30 @@ basic_astrodynamics::AccelerationMap HybridMethodModel::getLowThrustTrajectoryAc
     return accelerationModelMap;
 }
 
-
-//! Propagate the spacecraft trajectory to time-of-flight.
-Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
-{
-    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_, integratorSettings_ ).first;
-    return propagatedState;
-}
-
-
-
-//! Propagate the spacecraft trajectory to a given time.
-std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass, std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings )
-{
+propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulator(
+        double initialTime,
+        double finalTime,
+        Eigen::Vector6d initialState,
+        double initialMass,
+        std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
+        bool withDependent
+        ) {
     // Re-initialise integrator settings.
-    integratorSettings_->initialTime_ = initialTime;
+    integratorSettings->initialTime_ = initialTime;
 
-    bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass );
+    bodyMap_[bodyToPropagate_]->setConstantBodyMass(initialMass);
 
-    std::cout << "t0: " << initialTime << ", tf: " << finalTime << std::endl;
+    // std::cout << "t0: " << initialTime << ", tf: " << finalTime << std::endl;
 
     // // === CUSTOM TEST THRUST!  ===
+    // TODO:REMOVE OR REPLACE
     // std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > colinearThrustDirectionGuidanceSettings =
     //         std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
     // std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > constantThrustMagnitudeSettings =
     //         std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
     // std::shared_ptr< simulation_setup::AccelerationSettings > constantThrustAccelerationSettings = std::make_shared< simulation_setup::ThrustAccelerationSettings >( colinearThrustDirectionGuidanceSettings, constantThrustMagnitudeSettings );
 
-    // Acceleration from the central body.
-    std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > bodyToPropagateAccelerations;
-    bodyToPropagateAccelerations[ centralBody_ ].push_back( std::make_shared< simulation_setup::AccelerationSettings >(
-                                                                basic_astrodynamics::central_gravity ) );
-    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
-    // bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( constantThrustAccelerationSettings );
-
-    simulation_setup::SelectedAccelerationMap accelerationMap;
-    accelerationMap[ bodyToPropagate_ ] = bodyToPropagateAccelerations;
-
-    // Create the acceleration map.
-    basic_astrodynamics::AccelerationMap accelerationModelMap = createAccelerationModelsMap(
-                bodyMap_, accelerationMap, std::vector< std::string >{ bodyToPropagate_ }, std::vector< std::string >{ centralBody_ } );
-
+    basic_astrodynamics::AccelerationMap accelerationModelMap = getLowThrustTrajectoryAccelerationMap();
 
     // Create mass rate models
     std::map< std::string, std::shared_ptr< basic_astrodynamics::MassRateModel > > massRateModel;
@@ -142,130 +125,73 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
             = std::make_shared< propagators::PropagationTimeTerminationSettings >( finalTime, true );
 
     std::vector<std::shared_ptr<propagators::SingleDependentVariableSaveSettings> > dependentVariablesList;
-    dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
-            propagators::keplerian_state_dependent_variable, bodyToPropagate_, centralBody_ ) );
 
+    dependentVariablesList.push_back(std::make_shared<propagators::SingleDependentVariableSaveSettings>(
+            propagators::keplerian_state_dependent_variable, bodyToPropagate_, centralBody_));
     dependentVariablesList.push_back(std::make_shared<propagators::SingleAccelerationDependentVariableSaveSettings>(
             basic_astrodynamics::thrust_acceleration, bodyToPropagate_, bodyToPropagate_, 0));
-    dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
-            propagators::lvlh_to_inertial_frame_rotation_dependent_variable, bodyToPropagate_, centralBody_ ) );
+    dependentVariablesList.push_back(std::make_shared<propagators::SingleDependentVariableSaveSettings>(
+            propagators::lvlh_to_inertial_frame_rotation_dependent_variable, bodyToPropagate_, centralBody_));
+
     // dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
     //         propagators::rotation_matrix_to_body_fixed_frame_variable, "Vehicle", "Earth" ) );
     std::shared_ptr<propagators::DependentVariableSaveSettings> dependentVariablesToSave =
-            std::make_shared<propagators::DependentVariableSaveSettings>(dependentVariablesList);
+            std::make_shared<propagators::DependentVariableSaveSettings>(dependentVariablesList, withDependent);
 
-    int thrustIndex = 6;
+    // Define propagator settings.
+    std::shared_ptr<propagators::TranslationalStatePropagatorSettings<double> > translationalStatePropagatorSettings =
+            std::make_shared<propagators::TranslationalStatePropagatorSettings<double> >(
+                    std::vector<std::string>{centralBody_}, accelerationModelMap,
+                    std::vector<std::string>{bodyToPropagate_},
+                    initialState, terminationSettings, propagators::gauss_modified_equinoctial);
 
-        // Define propagator settings.
-        std::shared_ptr< propagators::TranslationalStatePropagatorSettings< double > > translationalStatePropagatorSettings =
-                std::make_shared< propagators::TranslationalStatePropagatorSettings< double > >(
-                    std::vector< std::string >{ centralBody_ }, accelerationModelMap, std::vector< std::string >{ bodyToPropagate_ },
-                    initialState, terminationSettings, propagators::gauss_modified_equinoctial );
+    // Create settings for propagating the mass of the vehicle.
+    std::shared_ptr<propagators::MassPropagatorSettings<double> > massPropagatorSettings
+            = std::make_shared<propagators::MassPropagatorSettings<double> >(
+                    std::vector<std::string>{bodyToPropagate_}, massRateModel,
+                    (Eigen::Matrix<double, 1, 1>() << bodyMap_[bodyToPropagate_]->getBodyMass()).finished(),
+                    terminationSettings);
 
-        // Create settings for propagating the mass of the vehicle.
-        std::shared_ptr< propagators::MassPropagatorSettings< double > > massPropagatorSettings
-                = std::make_shared< propagators::MassPropagatorSettings< double > >(
-                    std::vector< std::string >{ bodyToPropagate_ }, massRateModel,
-                    ( Eigen::Matrix< double, 1, 1 >( ) << bodyMap_[ bodyToPropagate_ ]->getBodyMass( ) ).finished( ),
-                    terminationSettings );
+    // Create list of propagation settings.
+    std::vector<std::shared_ptr<propagators::SingleArcPropagatorSettings<double> > > propagatorSettingsVector;
+    propagatorSettingsVector.push_back(translationalStatePropagatorSettings);
+    propagatorSettingsVector.push_back(massPropagatorSettings);
 
-        // Create list of propagation settings.
-        std::vector< std::shared_ptr< propagators::SingleArcPropagatorSettings< double > > > propagatorSettingsVector;
-        propagatorSettingsVector.push_back( translationalStatePropagatorSettings );
-        propagatorSettingsVector.push_back( massPropagatorSettings );
+    // Hybrid propagation settings.
+    std::shared_ptr<propagators::PropagatorSettings<double> > propagatorSettings =
+            std::make_shared<propagators::MultiTypePropagatorSettings<double> >(propagatorSettingsVector,
+                                                                                terminationSettings,
+                                                                                dependentVariablesToSave);
 
-        // Hybrid propagation settings.
-        std::shared_ptr< propagators::PropagatorSettings< double > > propagatorSettings =
-                std::make_shared< propagators::MultiTypePropagatorSettings< double > >( propagatorSettingsVector, terminationSettings, dependentVariablesToSave );
+    // Propagate the trajectory.
+    propagators::SingleArcDynamicsSimulator<> dynamicsSimulator(bodyMap_, integratorSettings, propagatorSettings);
 
-        integratorSettings_->initialTime_ = initialTime;
-
-        // Propagate the trajectory.
-        propagators::SingleArcDynamicsSimulator< > dynamicsSimulator( bodyMap_, integratorSettings_, propagatorSettings );
-
-        std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
-                dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
-
-
-    std::map< double, Eigen::VectorXd > integrationResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( );
-    std::map< double, Eigen::VectorXd > dependentVariableResult = dynamicsSimulator.getDependentVariableHistory( );
-    // Manually add thrust force in LVLH frame to output
-    for( std::map< double, Eigen::VectorXd >::iterator outputIterator = dependentVariableResult.begin( );
-         outputIterator != dependentVariableResult.end( ); outputIterator++ )
-    {
-        Eigen::Matrix3d currentRotationMatrix =
-                propagators::getMatrixFromVectorRotationRepresentation( outputIterator->second.segment( thrustIndex+3, 9 ) );
-        Eigen::Vector3d currentThrust = outputIterator->second.segment( thrustIndex+0, 3 );
-        Eigen::VectorXd newOutput = Eigen::VectorXd( thrustIndex+15 );
-        newOutput.segment( 0, thrustIndex+12 ) = outputIterator->second;
-        newOutput.segment( thrustIndex+12, 3 ) =
-                integrationResult.at( outputIterator->first )( 6 ) *
-                ( currentRotationMatrix.transpose( ) * currentThrust );
-        dependentVariableResult[ outputIterator->first ] = newOutput;
-    }
-
-        //Temporary stuff to directly store the dependent variable history (hopefully containing thrust acceleration profile)
-        std::cout << "Exporting Dependent Variable History!!" << std::endl;
-        input_output::writeDataMapToTextFile( dependentVariableResult,
-                                "thrustTestdependentVariableHistory.dat",
-                                "/home/robert/Temp",
-                                "",
-                                std::numeric_limits< double >::digits10,
-                                std::numeric_limits< double >::digits10,
-                                "," );
-        input_output::writeDataMapToTextFile( integrationResult,
-                                          "thrustTestIntegrationResult.dat",
-                                          "/home/robert/Temp",
-                                          "",
-                                          std::numeric_limits< double >::digits10,
-                                          std::numeric_limits< double >::digits10,
-                                          "," );
-
-        // std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > dependentVariableHistory = dynamicsSimulator.getDependentVariableHistory();
-
-        // double propagationResultTime = numericalSolution.rbegin( )->first;
-        // Eigen::VectorXd propagationResult = numericalSolution.at(propagationResultTime);
-
-        //TODO SEE WHAT HAPPENS
-//        std::cout << " -- computeStateDerivative t: " << propagationResultTime << " -> \n " << propagationResult << std::endl;
-
-        // double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
-
-        // std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
-        //         dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
-        //
-        // double propagationResultTime = numericalSolution.rbegin( )->first;
-//         Eigen::VectorXd propagationResult = numericalSolution.at(propagationResultTime);
-//
-//         //TODO SEE WHAT HAPPENS
-// //        std::cout << " -- computeStateDerivative t: " << propagationResultTime << " -> \n " << propagationResult << std::endl;
-//
-//         double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
-//
-//         Eigen::Vector6d propagatedMEEState = propagationResult.segment(0, 6);
-//         Eigen::Vector6d computedCartesianState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(propagatedMEEState, gravitationalParameter, false);
-//
-//
-//         // Find the state derivatives at t_f
-//         Eigen::VectorXd currentStateDerivative;
-//         double currentTime = numericalSolution.cbegin( )->first;
-//         currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
-//                 currentTime, numericalSolution.at(currentTime));
-
-        //        currentStateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(
-//                numericalSolution.cbegin( )->first, numericalSolution.at(numericalSolution.cbegin( )->first));
-        Eigen::VectorXd propagationOriginalResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( ).rbegin( )->second;
+    return dynamicsSimulator;
+}
 
 
-        // Retrieve state and mass of the spacecraft at the end of the propagation.
-        Eigen::Vector6d propagatedState = propagationOriginalResult.segment( 0, 6 );
-        // Eigen::Vector6d computedMMEStateDerivatives = currentStateDerivative.segment(0, 6);
-        Eigen::Vector6d computedMMEStateDerivatives;
-//
-//        std::cout << "-- computedMMEStateDerivatives -- \n" << computedMMEStateDerivatives << std::endl;
-//        std::cout << "-- computedCartesianState -- \n" << computedCartesianState << std::endl;
+//! Propagate the spacecraft trajectory to time-of-flight.
+Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
+{
+    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
+    return propagatedState;
+}
+
+//! Propagate the spacecraft trajectory to a given time.
+std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass)
+{
+    integratorSettings_->initialTime_ = initialTime;
+
+    propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(initialTime, finalTime, initialState, initialMass, integratorSettings_);
+
+    std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
+            dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
+    Eigen::VectorXd propagationOriginalResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( ).rbegin( )->second;
 
     // Retrieve state and mass of the spacecraft at the end of the propagation.
+    Eigen::Vector6d propagatedState = propagationOriginalResult.segment( 0, 6 );
+    Eigen::Vector6d computedMMEStateDerivatives;
+
     if ( finalTime == timeOfFlight_ )
     {
         massAtTimeOfFlight_ = propagationOriginalResult[ 6 ];
@@ -308,14 +234,14 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         {
             if ( currentTime > 0.0 )
             {
-                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass, integratorSettings_ ).first;
+                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass).first;
                 currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
             }
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
         else
         {
-            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass, integratorSettings_ ).first;
+            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass).first;
             currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
@@ -327,6 +253,34 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
     return propagatedTrajectory;
 }
 
+std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> HybridMethodModel::getTrajectoryOutput() {
+    std::shared_ptr<numerical_integrators::IntegratorSettings<double> > integratorSettings =
+            std::make_shared<numerical_integrators::IntegratorSettings<double> >
+                    (numerical_integrators::rungeKutta4, 0.0, 60.0);
+
+    propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_, integratorSettings, true);
+    std::map< double, Eigen::VectorXd > integrationResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( );
+    std::map< double, Eigen::VectorXd > dependentVariableResult = dynamicsSimulator.getDependentVariableHistory( );
+
+    // index to denote where the thrust accelerations start in the dependent variable history.
+    int thrustIndex = 6;
+    // Manually add thrust force in LVLH frame to output
+    for( std::map< double, Eigen::VectorXd >::iterator outputIterator = dependentVariableResult.begin( );
+         outputIterator != dependentVariableResult.end( ); outputIterator++ )
+    {
+        Eigen::Matrix3d currentRotationMatrix =
+                propagators::getMatrixFromVectorRotationRepresentation( outputIterator->second.segment( thrustIndex+3, 9 ) );
+        Eigen::Vector3d currentThrust = outputIterator->second.segment( thrustIndex+0, 3 );
+        Eigen::VectorXd newOutput = Eigen::VectorXd( thrustIndex+15 );
+        newOutput.segment( 0, thrustIndex+12 ) = outputIterator->second;
+        newOutput.segment( thrustIndex+12, 3 ) =
+                integrationResult.at( outputIterator->first )( 6 ) *
+                ( currentRotationMatrix.transpose( ) * currentThrust );
+        dependentVariableResult[ outputIterator->first ] = newOutput;
+    }
+
+    return std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> (integrationResult, dependentVariableResult);
+}
 
 //! Return the deltaV associated with the thrust profile of the trajectory.
 double HybridMethodModel::computeDeltaV( )
