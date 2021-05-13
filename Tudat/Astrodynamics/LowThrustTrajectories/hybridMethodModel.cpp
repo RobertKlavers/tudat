@@ -173,6 +173,9 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
 //! Propagate the spacecraft trajectory to time-of-flight.
 Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
 {
+    if (hybridOptimisationSettings_->debug_) {
+        std::cout << "    |" << timeOfFlight_ << "," << stateAtDeparture_.transpose()<< "," << initialSpacecraftMass_ << std::endl;
+    }
     Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
     return propagatedState;
 }
@@ -204,6 +207,7 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
 std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         std::vector< double > epochs, std::map< double, Eigen::Vector6d >& propagatedTrajectory )
 {
+    std::cout<< "PROPAGATING TO EPOCHS SHOULD BE OBSOLETE? " << std::endl;
     // Initialise propagated state.
     Eigen::Vector6d propagatedState = stateAtDeparture_;
 
@@ -303,30 +307,52 @@ std::pair<std::vector<double>, Eigen::Vector6d> HybridMethodModel::calculateFitn
     Eigen::Vector6d c;
     Eigen::Vector6d r;
     Eigen::Vector6d epsilon;
-    Eigen::Vector6d epsilon_lower;
-    epsilon_lower = Eigen::Vector6d::Zero();
+    Eigen::Vector6d epsilon_lower = Eigen::Vector6d::Zero(6);
+    Eigen::Vector6d epsilon_upper = Eigen::Vector6d::Zero(6);
 
-    std::vector<double> epsilon_vector;
+    // TODO this is ugly, make this more elegant
+    double deg2rad = mathematical_constants::PI / 180.0;
+    epsilon_upper(0) = hybridOptimisationSettings_->epsilonUpper_(0),
+    epsilon_upper(1) = hybridOptimisationSettings_->epsilonUpper_(1),
+    epsilon_upper(2) = hybridOptimisationSettings_->epsilonUpper_(2) * deg2rad,
+    epsilon_upper(3) = hybridOptimisationSettings_->epsilonUpper_(3) * deg2rad,
+    epsilon_upper(4) = hybridOptimisationSettings_->epsilonUpper_(4) * deg2rad,
+    epsilon_upper(5) = hybridOptimisationSettings_->epsilonUpper_(5) * deg2rad;
+
+    // Aggregate Objective Function (epsilons + tof + mass)
+    std::vector<double> aof_vector;
 
     // 5 for no longitude targeting?
     for ( int i = 0 ; i < 6 ; i++ )
     {
-        c[ i ] = 1.0 / (hybridOptimisationSettings_->epsilonUpper_(i) - epsilon_lower(i));
-        r[ i ] = 1.0 - hybridOptimisationSettings_->epsilonUpper_(i) * c[ i ];
+        c[ i ] = 1.0 / (epsilon_upper(i)- epsilon_lower(i));
+        r[ i ] = 1.0 - epsilon_upper(i) * c[ i ];
         epsilon[ i ] = error[ i ] * c[ i ] + r[ i ];
     }
     // Determine scaled epsilon at TOF
-    double epsilon_final = 0.0;
     for ( int i = 0 ; i < 6 ; i++) {
-        epsilon_vector.push_back(hybridOptimisationSettings_->constraintWeights_[i] * epsilon[i] * epsilon[i]);
+        aof_vector.push_back(hybridOptimisationSettings_->constraintWeights_[i] * epsilon[i] * epsilon[i]);
     }
 
     // AOF From Jimenez: F = sum(orbit error) + W_t*t_f + W_m*(1 - m_f/m_0)
     double finalMass = getMassAtTimeOfFlight();
-    epsilon_vector.push_back(hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_);
-    epsilon_vector.push_back(hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
+    aof_vector.push_back(hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_);
+    aof_vector.push_back(hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
 
-    return {epsilon_vector, error};
+    // Some debugging statements we don't actually directly output the fitness
+    if (hybridOptimisationSettings_->debug_) {
+        double totalEps = 0.0;
+        for (auto& n : aof_vector) {
+            totalEps+= n;
+        }
+
+        std::cout << "\n\n--fitcalc--" << std::endl;
+        std::cout << "  cfu:" << costatesFunction_(0.0).transpose() << "] | [" << costatesFunction_(timeOfFlight_).transpose() << std::endl;
+        std::cout << "  x_f: " << finalPropagatedState.transpose() << std::endl;
+        std::cout << "  err:" << error.transpose() << std::endl;
+        std::cout << "  sum_e: " << totalEps << std::endl;
+    }
+    return {aof_vector, error};
 }
 
 //! Return the deltaV associated with the thrust profile of the trajectory.

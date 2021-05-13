@@ -30,15 +30,12 @@ namespace tudat {
     namespace simulation_setup {
         class HybridOptimisationSettings {
         public:
-            HybridOptimisationSettings(
-                    const Eigen::Vector6d epsilonUpper,
-                    const Eigen::Vector6d constraintWeights,
-                    const double weightMass,
-                    const double weightTimeOfFlight) :
+            HybridOptimisationSettings(const Eigen::Vector6d epsilonUpper, const Eigen::Vector6d constraintWeights,
+                                       const double weightMass, const double weightTimeOfFlight, const bool debug) :
                     epsilonUpper_(epsilonUpper),
                     constraintWeights_(constraintWeights),
                     weightMass_(weightMass),
-                    weightTimeOfFlight_(weightTimeOfFlight) {}
+                    weightTimeOfFlight_(weightTimeOfFlight), debug_(debug) {}
 
             //! Destructor.
             virtual ~HybridOptimisationSettings() {}
@@ -47,6 +44,7 @@ namespace tudat {
             const Eigen::Vector6d constraintWeights_;
             const double weightMass_;
             const double weightTimeOfFlight_;
+            const bool debug_;
         };
 
 

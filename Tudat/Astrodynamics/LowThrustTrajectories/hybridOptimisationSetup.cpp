@@ -147,8 +147,19 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     for (auto& epsilon : fitnessResults.first) {
         totalEpsilon += epsilon;
     }
-    // std::cout << "f: "<< optimisationObjectiveHostep << ", eps: " << epsilon.transpose() << "("<< epsilon_final << "), err:" << error.transpose() << std::endl;
 
+    if (hybridOptimisationSettings_->debug_) {
+        std::cout << "f: "<< totalEpsilon << ", eps: [";
+        for (auto &f : fitnessResults.first) {
+            std::cout << f << ", ";
+        }
+        std::cout << "], err: [" << fitnessResults.second.transpose() << "]";
+        std::cout << "  cst: [" << initialCostates.transpose() << "] | [" << finalCostates.transpose() << "]" << std::endl;
+        for (int j = 0; j < 6; j++) {
+            std::cout << "[" << designVariables[j] << ", " << designVariables[j + 6] << "], ";
+        }
+        std::cout << "(" << designVariables.size() << ")" << std::endl;
+    }
     // Output of the fitness function..
     fitness.push_back( totalEpsilon );
 

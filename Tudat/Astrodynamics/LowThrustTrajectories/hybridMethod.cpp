@@ -54,7 +54,7 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
 
 
     // // Evolve for N generations
-    for( int i = 0 ; i < optimisationSettings_->numberOfGenerations_ ; i++ )
+    for( int gen = 0 ; gen < optimisationSettings_->numberOfGenerations_ ; gen++ )
     {
         island.evolve( );
         while( island.status( ) != pagmo::evolve_status::idle &&
@@ -62,9 +62,8 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
         {
             island.wait( );
         }
-        island.wait_check( ); // Raises errors
+        // island.wait_check( ); // Raises errors
 
-        std::cout << "gen: " << i << ", f: " << island.get_population().champion_f()[0] << std::endl;
 
         std::vector<double> championDesignVector = island.get_population().champion_x();
 
@@ -86,15 +85,42 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
             finalCostates( i ) = championDesignVector[ i + 6 ];
         }
 
+        // Make sure to reset the initial Mass
+        bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass(initialMass_);
+
         // Create hybrid method leg.
-        HybridMethodModel currentLeg = HybridMethodModel(
+        HybridMethodModel currentMethodModel = HybridMethodModel(
                 stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_,
                 specificImpulse_, timeOfFlight_, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
 
+
+        std::pair<std::vector<double>, Eigen::Vector6d> fitnessResults = currentMethodModel.calculateFitness();
+
+        double rad2deg = 180.0 /  mathematical_constants::PI;
+
+        Eigen::Vector6d error_vec;
+        error_vec <<
+            fitnessResults.second(0),
+            fitnessResults.second(1),
+            fitnessResults.second(2) * rad2deg,
+            fitnessResults.second(3) * rad2deg,
+            fitnessResults.second(4) * rad2deg,
+            fitnessResults.second(5) * rad2deg;
+
+        // Print results
+        std::cout << "\n==== gen: " << gen << ", f: " << island.get_population().champion_f()[0] << " ====" << std::endl;
+        std::cout << "  best: ";
         for (int j = 0; j < 6; j++) {
             std::cout << "[" << championDesignVector[j] << ", " << championDesignVector[j + 6] << "], ";
         }
         std::cout << "(" << championDesignVector.size() << ")" << std::endl;
+        std::cout << "  eps: [";
+        for (auto &f : fitnessResults.first) {
+            std::cout << f << ", ";
+        }
+        std::cout << "]" << std::endl;
+        std::cout << "  err: [" << error_vec.transpose() << "]" <<std::endl;
+        std::cout << "  cst: [" << initialCostates.transpose() << "] | [" << finalCostates.transpose() << "]" << std::endl;
     }
 
     championFitness_ = island.get_population().champion_f();
@@ -115,7 +141,7 @@ Eigen::Vector3d HybridMethod::computeCurrentThrustForce(
         std::function< double ( const double ) > specificImpulseFunction,
         std::shared_ptr<numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
-
+    std::cout<<"computeCurrentThrustForce"<<std::endl;
     std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings = hybridMethodModel_->getMEEcostatesBasedThrustMagnitudeSettings( );
 
     std::function< Eigen::Vector3d( ) > bodyFixedThrustDirection = simulation_setup::getBodyFixedThrustDirection(
@@ -162,6 +188,7 @@ void HybridMethod::getThrustForceProfile(
         std::function< double ( const double ) > specificImpulseFunction,
         std::shared_ptr<numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
+    std::cout<<"getThrustForceProfile"<<std::endl;
     thrustProfile.clear( );
 
     std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings = hybridMethodModel_->getMEEcostatesBasedThrustMagnitudeSettings( );
@@ -221,7 +248,7 @@ double HybridMethod::computeCurrentThrustAccelerationMagnitude(
         double currentTime, std::function< double ( const double ) > specificImpulseFunction,
         std::shared_ptr<numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
-
+    std::cout<<"computeCurrentThrustAccelerationMagnitude"<<std::endl;
     double currentMass = computeCurrentMass( currentTime, specificImpulseFunction, integratorSettings );
     Eigen::Vector3d currentThrustVector = computeCurrentThrustForce( currentTime, specificImpulseFunction, integratorSettings_ );
 
@@ -235,7 +262,7 @@ Eigen::Vector3d HybridMethod::computeCurrentThrustAccelerationDirection(
         double currentTime, std::function< double ( const double ) > specificImpulseFunction,
         std::shared_ptr<numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
-
+    std::cout<<"computeCurrentThrustAccelerationDirection"<<std::endl;
     Eigen::Vector3d currentThrustVector = computeCurrentThrustForce( currentTime, specificImpulseFunction, integratorSettings );
 
     Eigen::Vector3d thrustAcceleration = currentThrustVector.normalized( );
@@ -252,6 +279,7 @@ void HybridMethod::getThrustAccelerationProfile(
         std::function< double ( const double ) > specificImpulseFunction,
         std::shared_ptr<numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
+    std::cout<<"getThrustAccelerationProfile"<<std::endl;
     thrustAccelerationProfile.clear();
 
     std::map< double, Eigen::VectorXd > thrustProfile;
@@ -282,6 +310,7 @@ void HybridMethod::getThrustAccelerationProfile(
 //! Compute current cartesian state.
 Eigen::Vector6d HybridMethod::computeCurrentStateVector( const double currentTime )
 {
+    std::cout<<"computeCurrentStateVector"<<std::endl;
     Eigen::Vector6d stateVector;
     if ( currentTime == 0.0 )
     {
@@ -305,6 +334,7 @@ basic_astrodynamics::AccelerationMap HybridMethod::retrieveLowThrustAcceleration
         const std::function< double ( const double ) > specificImpulseFunction,
         const std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings )
 {
+    std::cout<<"retrieveLowThrustAccelerationMap"<<std::endl;
     basic_astrodynamics::AccelerationMap hybridMethodAccelerationMap = hybridMethodModel_->getLowThrustTrajectoryAccelerationMap( );
     return hybridMethodAccelerationMap;
 }
@@ -319,7 +349,7 @@ HybridMethod::createLowThrustTranslationalStatePropagatorSettings(
         const basic_astrodynamics::AccelerationMap& accelerationModelMap,
         const std::shared_ptr< propagators::DependentVariableSaveSettings > dependentVariablesToSave )
 {
-
+    std::cout<<"createLowThrustTranslationalStatePropagatorSettings"<<std::endl;
     // Create termination conditions settings.
     std::pair< std::shared_ptr< propagators::PropagationTerminationSettings >,
             std::shared_ptr< propagators::PropagationTerminationSettings > > terminationConditions;

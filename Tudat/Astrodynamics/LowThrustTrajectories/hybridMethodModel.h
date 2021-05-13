@@ -60,7 +60,6 @@ public:
         costatesFunction_ = [ = ]( const double currentTime )
         {
             Eigen::VectorXd currentCostates(initialCoStates.size());
-            currentCostates.resize( 6 );
 
             for ( int i = 0 ; i < 6 ; i++ )
             {
@@ -71,8 +70,8 @@ public:
         };
 
         // Initialise mass at time of flight (before propagation).
-       Eigen::Vector6d propagatedStateAtTimeOfFlight = propagateTrajectory( );
-
+        // TODO: I believe this is no longer required: Check this!
+       // Eigen::Vector6d propagatedStateAtTimeOfFlight = propagateTrajectory( );
     }
 
 
