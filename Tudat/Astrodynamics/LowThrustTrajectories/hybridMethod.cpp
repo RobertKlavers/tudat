@@ -28,19 +28,22 @@ namespace low_thrust_trajectories
 std::pair< std::vector< double >, std::vector< double > > HybridMethod::performOptimisation( )
 {
     //Set seed for reproducible results
-    // pagmo::random_device::set_seed( 456 );
+    pagmo::random_device::set_seed( 456 );
 
     // Create object to compute the problem fitness
-    problem prob{ HybridMethodProblem( stateAtDeparture_, stateAtArrival_, maximumThrust_, specificImpulse_, timeOfFlight_, bodyMap_,
-                                       bodyToPropagate_, centralBody_, integratorSettings_, initialGuessThrustModel_, initialAndFinalMEEcostatesBounds_,
-                                       optimisationSettings_->relativeToleranceConstraints_ )};
+    problem prob{
+            HybridMethodProblem(stateAtDeparture_, stateAtArrival_, maximumThrust_, specificImpulse_, timeOfFlight_,
+                                bodyMap_,
+                                bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_,
+                                initialGuessCostates_, initialAndFinalMEEcostatesBounds_,
+                                optimisationSettings_->relativeToleranceConstraints_)};
 
-    // std::vector< double > constraintsTolerance;
-    // for ( unsigned int i = 0 ; i < ( prob.get_nec() + prob.get_nic() ) ; i++ )
-    // {
-    //     constraintsTolerance.push_back( 1.0e-3 );
-    // }
-    // prob.set_c_tol( constraintsTolerance );
+    std::vector<double> constraintsTolerance;
+    for ( unsigned int i = 0 ; i < ( prob.get_nec() + prob.get_nic() ) ; i++ )
+    {
+        constraintsTolerance.push_back( 1.0e-3 );
+    }
+    prob.set_c_tol( constraintsTolerance );
 
     algorithm algo = optimisationSettings_->optimisationAlgorithm_;
 
@@ -64,6 +67,30 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
         std::cout << "gen: " << i << ", f: " << island.get_population().champion_f()[0] << std::endl;
 
         std::vector<double> championDesignVector = island.get_population().champion_x();
+
+        // TODO Extract to common method for both here and in pagmo UDP
+        // Transform vector of design variables into 3D vector of throttles.
+        Eigen::VectorXd initialCostates = Eigen::VectorXd::Zero( 6 );
+        Eigen::VectorXd finalCostates = Eigen::VectorXd::Zero( 6 );
+
+        // Check consistency of the size of the design variables vector.
+        if ( championDesignVector.size( ) != 12 )
+        {
+            throw std::runtime_error( "Error, size of the design variables vector unconsistent with initial and final "
+                                      "MEE costates sizes." );
+        }
+
+        for ( unsigned int i = 0 ; i < 6 ; i++ )
+        {
+            initialCostates( i ) = championDesignVector[ i ];
+            finalCostates( i ) = championDesignVector[ i + 6 ];
+        }
+
+        // Create hybrid method leg.
+        HybridMethodModel currentLeg = HybridMethodModel(
+                stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_,
+                specificImpulse_, timeOfFlight_, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
+
         for (int j = 0; j < 6; j++) {
             std::cout << "[" << championDesignVector[j] << ", " << championDesignVector[j + 6] << "], ";
         }

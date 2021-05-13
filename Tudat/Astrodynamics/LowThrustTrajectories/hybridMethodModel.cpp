@@ -253,6 +253,7 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
     return propagatedTrajectory;
 }
 
+//! Utility to retrieve the integration result and all saved dependent variables
 std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> HybridMethodModel::getTrajectoryOutput() {
     std::shared_ptr<numerical_integrators::IntegratorSettings<double> > integratorSettings =
             std::make_shared<numerical_integrators::IntegratorSettings<double> >
@@ -280,6 +281,52 @@ std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd
     }
 
     return std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> (integrationResult, dependentVariableResult);
+}
+
+std::pair<std::vector<double>, Eigen::Vector6d> HybridMethodModel::calculateFitness() {
+    // Propagate until time of flight is reached.
+    Eigen::Vector6d finalPropagatedState = propagateTrajectory( );
+
+    // Convert final propagated state to MEE.
+    Eigen::Vector6d finalPropagatedKeplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(
+            finalPropagatedState, bodyMap_[ centralBody_ ]->getGravityFieldModel()->getGravitationalParameter() );
+
+    // Convert targeted final state to MEE.
+    Eigen::Vector6d finalTargetedKeplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(
+            stateAtArrival_, bodyMap_[ centralBody_ ]->getGravityFieldModel()->getGravitationalParameter() );
+
+
+    // TODO: Wrap Angle? [0, 360)
+    Eigen::Vector6d error = (finalPropagatedKeplerianState - finalTargetedKeplerianState).cwiseAbs();
+
+    // Compute auxiliary variables.
+    Eigen::Vector6d c;
+    Eigen::Vector6d r;
+    Eigen::Vector6d epsilon;
+    Eigen::Vector6d epsilon_lower;
+    epsilon_lower = Eigen::Vector6d::Zero();
+
+    std::vector<double> epsilon_vector;
+
+    // 5 for no longitude targeting?
+    for ( int i = 0 ; i < 6 ; i++ )
+    {
+        c[ i ] = 1.0 / (hybridOptimisationSettings_->epsilonUpper_(i) - epsilon_lower(i));
+        r[ i ] = 1.0 - hybridOptimisationSettings_->epsilonUpper_(i) * c[ i ];
+        epsilon[ i ] = error[ i ] * c[ i ] + r[ i ];
+    }
+    // Determine scaled epsilon at TOF
+    double epsilon_final = 0.0;
+    for ( int i = 0 ; i < 6 ; i++) {
+        epsilon_vector.push_back(hybridOptimisationSettings_->constraintWeights_[i] * epsilon[i] * epsilon[i]);
+    }
+
+    // AOF From Jimenez: F = sum(orbit error) + W_t*t_f + W_m*(1 - m_f/m_0)
+    double finalMass = getMassAtTimeOfFlight();
+    epsilon_vector.push_back(hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_);
+    epsilon_vector.push_back(hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
+
+    return {epsilon_vector, error};
 }
 
 //! Return the deltaV associated with the thrust profile of the trajectory.

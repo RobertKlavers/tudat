@@ -19,6 +19,10 @@
 #include <map>
 #include "Tudat/Astrodynamics/LowThrustTrajectories/hybridMethodModel.h"
 #include "Tudat/SimulationSetup/optimisationSettings.h"
+#include "Tudat/SimulationSetup/hybridOptimisationSettings.h"
+#include <json/src/json.hpp>
+
+using json = nlohmann::json;
 
 namespace tudat
 {
@@ -43,7 +47,8 @@ public:
             const std::string centralBody,
             std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
             std::shared_ptr< simulation_setup::OptimisationSettings > optimisationSettings,
-            const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 1.0e4, 1.0e4 ) ):
+            const std::pair< double, double > initialAndFinalMEEcostatesBounds,
+            std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings):
         LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, initialSpacecraftMass, true ),
         centralBodyGravitationalParameter_( centralBodyGravitationalParameter ),
         bodyMap_( bodyMap ),
@@ -53,7 +58,8 @@ public:
         specificImpulse_( specificImpulse ),
         integratorSettings_( integratorSettings ),
         optimisationSettings_( optimisationSettings ),
-        initialAndFinalMEEcostatesBounds_( initialAndFinalMEEcostatesBounds )
+        initialAndFinalMEEcostatesBounds_( initialAndFinalMEEcostatesBounds ),
+        hybridOptimisationSettings_( hybridOptimisationSettings )
     {
 
         // Convert the thrust model proposed as initial guess into simplified thrust model adapted to the hybrid method.
@@ -67,14 +73,14 @@ public:
             else
             {
                 Eigen::VectorXd initialGuessMEEinitialAndFinalCostates( 12 ); // No entirely sure why this is needed
-                initialGuessThrustModel_.first = optimisationSettings_->initialGuessThrustModel_.first;
+                initialGuessCostates_.first = optimisationSettings_->initialGuessThrustModel_.first;
             }
         }
         else
         {
-            initialGuessThrustModel_.first = std::vector< double>( );
+            initialGuessCostates_.first = std::vector< double>( );
         }
-        initialGuessThrustModel_.second = optimisationSettings_->initialGuessThrustModel_.second;
+        initialGuessCostates_.second = optimisationSettings_->initialGuessThrustModel_.second;
 
        // Perform optimisation
        std::pair< std::vector< double >, std::vector< double > > bestIndividual = performOptimisation( );
@@ -96,7 +102,7 @@ public:
         // Create Hybrid leg from the best optimisation individual.
         hybridMethodModel_ = std::make_shared< HybridMethodModel >(
                     stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_, specificImpulse_, timeOfFlight_,
-                    bodyMap_, bodyToPropagate_, centralBody_, integratorSettings );
+                    bodyMap_, bodyToPropagate_, centralBody_, integratorSettings, hybridOptimisationSettings_ );
 
     }
 
@@ -228,7 +234,7 @@ private:
     //! Initial guess for the optimisation.
     //! The first element contains the thrust throttles corresponding to the initial guess for the thrust model.
     //! The second element defines the bounds around the initial time (in percentage).
-    std::pair< std::vector< double >, double > initialGuessThrustModel_;
+    std::pair< std::vector< double >, double > initialGuessCostates_;
 
     //! Fitness vector of the optimisation best individual.
     std::vector< double > championFitness_;
@@ -242,6 +248,7 @@ private:
     //! Lower and upper bounds for the initial and final MEE costates.
     std::pair< double, double > initialAndFinalMEEcostatesBounds_;
 
+    std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings_;
 
 };
 

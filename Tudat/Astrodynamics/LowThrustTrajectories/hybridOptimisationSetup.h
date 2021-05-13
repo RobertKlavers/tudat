@@ -22,6 +22,7 @@
 #include "pagmo/problem.hpp"
 
 #include "Tudat/SimulationSetup/tudatSimulationHeader.h"
+#include "Tudat/SimulationSetup/hybridOptimisationSettings.h"
 
 using namespace pagmo;
 
@@ -48,7 +49,8 @@ struct HybridMethodProblem
                          const std::string bodyToPropagate,
                          const std::string centralBody,
                          std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
-                         const std::pair< std::vector< double >, double > initialGuessThrustModel,
+                         std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings,
+                         const std::pair< std::vector< double >, double > initialGuessCostates_,
                          const std::pair< double, double > initialAndFinalMEEcostatesBounds = std::make_pair( - 10000.0, 10000.0 ),
                          const double relativeToleranceConstraints = 1.0e-6 );
 
@@ -115,7 +117,7 @@ private:
     //! Initial guess for the optimisation.
     //! The first element contains the thrust throttles corresponding to the initial guess for the thrust model.
     //! The second element defines the bounds around the initial time (in percentage).
-    std::pair< std::vector< double >, double > initialGuessThrustModel_;
+    std::pair< std::vector< double >, double > initialGuessCostates_;
 
     //! Initial and final MEE costates for the thrust model initial guess.
     std::vector< double > guessInitialAndFinalCostates_;
@@ -129,10 +131,7 @@ private:
     //! Relative tolerance for optimisation constraints.
     double relativeToleranceConstraints_;
 
-
-
-
-
+    std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings_;
 };
 
 } // namespace low_thrust_trajectories

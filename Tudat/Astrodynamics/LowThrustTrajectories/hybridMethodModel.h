@@ -13,6 +13,7 @@
 #define TUDAT_HYBRID_METHOD_MODEL_H
 
 #include "Tudat/SimulationSetup/tudatSimulationHeader.h"
+#include "Tudat/SimulationSetup/hybridOptimisationSettings.h"
 #include <cmath>
 #include <vector>
 #include <Eigen/Dense>
@@ -37,7 +38,8 @@ public:
                      simulation_setup::NamedBodyMap& bodyMap,
                      const std::string bodyToPropagate,
                      const std::string centralBody,
-                     std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings ):
+                     std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
+                     std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings ):
     stateAtDeparture_( stateAtDeparture ), stateAtArrival_( stateAtArrival ), initialCoStates_( initialCoStates ),
     finalCoStates_( finalCoStates ), maximumThrust_( maximumThrust ),
     specificImpulse_( specificImpulse ),
@@ -45,7 +47,8 @@ public:
     bodyMap_( bodyMap ),
     bodyToPropagate_( bodyToPropagate ),
     centralBody_( centralBody ),
-    integratorSettings_( integratorSettings )
+    integratorSettings_( integratorSettings ),
+    hybridOptimisationSettings_( hybridOptimisationSettings )
     {
         // Initialise value of the total deltaV.
         totalDeltaV_ = 0.0;
@@ -153,6 +156,8 @@ public:
         return costatesFunction_;
     }
 
+    std::pair<std::vector<double>, Eigen::Vector6d> calculateFitness();
+
 protected:
 
 private:
@@ -194,6 +199,8 @@ private:
 
     //! Integrator settings.
     std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings_;
+
+    std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings_;
 
     //! Total deltaV.
     double totalDeltaV_;
