@@ -98,10 +98,11 @@ public:
        }
 
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass( initialMass_ );
+       double tofDecVec = championDesignVariables_[0];
 
         // Create Hybrid leg from the best optimisation individual.
         hybridMethodModel_ = std::make_shared< HybridMethodModel >(
-                    stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_, specificImpulse_, timeOfFlight_,
+                    stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_, specificImpulse_, tofDecVec,
                     bodyMap_, bodyToPropagate_, centralBody_, integratorSettings, hybridOptimisationSettings_ );
 
     }
@@ -250,6 +251,7 @@ private:
 
     std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings_;
 
+    HybridMethodModel getModelForDecisionVector(std::vector<double> designVector);
 };
 
 

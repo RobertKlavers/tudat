@@ -76,6 +76,10 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethodProblem::g
     // Define upper bounds.
     std::vector< double > upperBounds;
 
+    //TODO TEMPORARILY SET THE BOUNDS FOR TOF HERE!
+    lowerBounds.push_back(0.0);
+    upperBounds.push_back(5.0 * physical_constants::JULIAN_DAY);
+
     if ( guessInitialAndFinalCostates_.size( ) != 0 )
     {
         if ( guessInitialAndFinalCostates_.size() != 12 )
@@ -114,22 +118,30 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethodProblem::g
 std::vector< double > HybridMethodProblem::fitness( const std::vector< double > &designVariables ) const {
     std::vector< double > fitness;
 
+    if (hybridOptimisationSettings_->debug_) {
+        std::cout << "fit: [";
+        for (auto& n: designVariables) {
+            std::cout << n << ", ";
+        }
+        std::cout << "]" << std::endl;
+    }
+
+    double tofDecisionVector = designVariables[0];
 
     // Transform vector of design variables into 3D vector of throttles.
     Eigen::VectorXd initialCostates = Eigen::VectorXd::Zero( 6 );
     Eigen::VectorXd finalCostates = Eigen::VectorXd::Zero( 6 );
 
     // Check consistency of the size of the design variables vector.
-    if ( designVariables.size( ) != 12 )
+    if ( designVariables.size( ) != 13 )
     {
         throw std::runtime_error( "Error, size of the design variables vector unconsistent with initial and final "
                                   "MEE costates sizes." );
     }
 
-    for ( unsigned int i = 0 ; i < 6 ; i++ )
-    {
-        initialCostates( i ) = designVariables[ i ];
-        finalCostates( i ) = designVariables[ i + 6 ];
+    for ( unsigned int i = 0 ; i < 6 ; i++ ) {
+        initialCostates(i) = designVariables[i + 1];
+        finalCostates(i) = designVariables[i + 1 + 6];
     }
 
     // Re-initialise mass of the spacecraft.
@@ -138,25 +150,19 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     // Create hybrid method leg.
     HybridMethodModel currentLeg = HybridMethodModel(
             stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_,
-            specificImpulse_, timeOfFlight_, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
+            specificImpulse_, tofDecisionVector, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
 
-    std::pair<std::vector<double>, Eigen::Vector6d> fitnessResults = currentLeg.calculateFitness();
+    std::pair<Eigen::VectorXd, Eigen::Vector6d> fitnessResults = currentLeg.calculateFitness();
 
-    double totalEpsilon = 0;
-
-    for (auto& epsilon : fitnessResults.first) {
-        totalEpsilon += epsilon;
-    }
+    double totalEpsilon = fitnessResults.first.sum();
 
     if (hybridOptimisationSettings_->debug_) {
-        std::cout << "f: "<< totalEpsilon << ", eps: [";
-        for (auto &f : fitnessResults.first) {
-            std::cout << f << ", ";
-        }
-        std::cout << "], err: [" << fitnessResults.second.transpose() << "]";
+        std::cout << "f: "<< totalEpsilon;
+        std::cout << ", eps: [" << fitnessResults.first.transpose() << "]" << std::endl;
+        std::cout << "  err: [" << fitnessResults.second.transpose() << "]" << std::endl;
         std::cout << "  cst: [" << initialCostates.transpose() << "] | [" << finalCostates.transpose() << "]" << std::endl;
         for (int j = 0; j < 6; j++) {
-            std::cout << "[" << designVariables[j] << ", " << designVariables[j + 6] << "], ";
+            std::cout << "[" << designVariables[j+1] << ", " << designVariables[j+1 + 6] << "], ";
         }
         std::cout << "(" << designVariables.size() << ")" << std::endl;
     }

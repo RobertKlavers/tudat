@@ -155,7 +155,7 @@ public:
         return costatesFunction_;
     }
 
-    std::pair<std::vector<double>, Eigen::Vector6d> calculateFitness();
+    std::pair<Eigen::VectorXd, Eigen::Vector6d> calculateFitness();
 
 protected:
 

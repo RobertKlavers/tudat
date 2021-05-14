@@ -23,12 +23,44 @@ namespace tudat
 namespace low_thrust_trajectories
 {
 
+HybridMethodModel HybridMethod::getModelForDecisionVector(std::vector<double> designVector) {
+
+    // TODO Extract to common method for both here and in pagmo UDP
+    Eigen::VectorXd initialCostates = Eigen::VectorXd::Zero( 6 );
+    Eigen::VectorXd finalCostates = Eigen::VectorXd::Zero( 6 );
+
+    // Check consistency of the size of the design variables vector.
+    if ( designVector.size( ) != 13 )
+    {
+        throw std::runtime_error( "Error, size of the design variables vector unconsistent with initial and final "
+                                  "MEE costates sizes." );
+    }
+
+    double timeOfFlight = designVector[0];
+
+    for ( unsigned int i = 0 ; i < 6 ; i++ )
+    {
+        initialCostates( i ) = designVector[ i+1 ];
+        finalCostates( i ) = designVector[ i+1 + 6 ];
+    }
+
+    // Make sure to reset the initial Mass
+    bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass(initialMass_);
+
+    // Create hybrid method leg.
+    HybridMethodModel hybridMethodModel = HybridMethodModel(
+            stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_,
+            specificImpulse_, timeOfFlight, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
+    return hybridMethodModel;
+}
 
 //! Perform optimisation.
 std::pair< std::vector< double >, std::vector< double > > HybridMethod::performOptimisation( )
 {
     //Set seed for reproducible results
-    pagmo::random_device::set_seed( 456 );
+    pagmo::random_device::set_seed( 42 );
+
+    std::string outputDirectory = "/home/robert/tud/thesis/analysis/data/hybridResults/";
 
     // Create object to compute the problem fitness
     problem prob{
@@ -51,11 +83,13 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
 
     island island{ algo, prob, populationSize };
 
-
+    std::map<int, Eigen::VectorXd> hybridFitnessResults;
+    std::map<int, Eigen::Vector6d> hybridErrorResults;
 
     // // Evolve for N generations
     for( int gen = 0 ; gen < optimisationSettings_->numberOfGenerations_ ; gen++ )
     {
+        // Evolve the current population
         island.evolve( );
         while( island.status( ) != pagmo::evolve_status::idle &&
                island.status( ) != pagmo::evolve_status::idle_error )
@@ -63,38 +97,19 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
             island.wait( );
         }
         // island.wait_check( ); // Raises errors
-
-
+        // Get the best individual of this generation
         std::vector<double> championDesignVector = island.get_population().champion_x();
-
-        // TODO Extract to common method for both here and in pagmo UDP
-        // Transform vector of design variables into 3D vector of throttles.
-        Eigen::VectorXd initialCostates = Eigen::VectorXd::Zero( 6 );
-        Eigen::VectorXd finalCostates = Eigen::VectorXd::Zero( 6 );
-
-        // Check consistency of the size of the design variables vector.
-        if ( championDesignVector.size( ) != 12 )
-        {
-            throw std::runtime_error( "Error, size of the design variables vector unconsistent with initial and final "
-                                      "MEE costates sizes." );
-        }
-
-        for ( unsigned int i = 0 ; i < 6 ; i++ )
-        {
-            initialCostates( i ) = championDesignVector[ i ];
-            finalCostates( i ) = championDesignVector[ i + 6 ];
-        }
 
         // Make sure to reset the initial Mass
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass(initialMass_);
 
-        // Create hybrid method leg.
-        HybridMethodModel currentMethodModel = HybridMethodModel(
-                stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_,
-                specificImpulse_, timeOfFlight_, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
+        HybridMethodModel currentHybridMethodModel = getModelForDecisionVector(championDesignVector);
 
+        std::pair<Eigen::VectorXd, Eigen::Vector6d> fitnessResults = currentHybridMethodModel.calculateFitness();
+        std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> currentBestTrajectory = currentHybridMethodModel.getTrajectoryOutput();
 
-        std::pair<std::vector<double>, Eigen::Vector6d> fitnessResults = currentMethodModel.calculateFitness();
+        hybridFitnessResults[gen] = fitnessResults.first;
+        hybridErrorResults[gen] = fitnessResults.second;
 
         double rad2deg = 180.0 /  mathematical_constants::PI;
 
@@ -107,24 +122,65 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
             fitnessResults.second(4) * rad2deg,
             fitnessResults.second(5) * rad2deg;
 
+        input_output::writeDataMapToTextFile(currentBestTrajectory.first,
+                                             "HybridCurrentBestTrajectory.dat",
+                                             outputDirectory,
+                                             "",
+                                             std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                             ",");
+        input_output::writeDataMapToTextFile(currentBestTrajectory.second,
+                                             "HybridCurrentBestDependentVariables.dat",
+                                             outputDirectory,
+                                             "",
+                                             std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                             ",");
+
         // Print results
         std::cout << "\n==== gen: " << gen << ", f: " << island.get_population().champion_f()[0] << " ====" << std::endl;
-        std::cout << "  best: ";
-        for (int j = 0; j < 6; j++) {
+        std::cout << "  best: [" << (championDesignVector[0]/physical_constants::JULIAN_DAY) << "], ";
+        for (int j = 1; j < 7; j++) {
             std::cout << "[" << championDesignVector[j] << ", " << championDesignVector[j + 6] << "], ";
         }
         std::cout << "(" << championDesignVector.size() << ")" << std::endl;
-        std::cout << "  eps: [";
-        for (auto &f : fitnessResults.first) {
-            std::cout << f << ", ";
-        }
-        std::cout << "]" << std::endl;
+        std::cout << "  eps: [" << fitnessResults.first.transpose() << "]" << std::endl;
         std::cout << "  err: [" << error_vec.transpose() << "]" <<std::endl;
-        std::cout << "  cst: [" << initialCostates.transpose() << "] | [" << finalCostates.transpose() << "]" << std::endl;
     }
 
     championFitness_ = island.get_population().champion_f();
     championDesignVariables_ = island.get_population().champion_x();
+
+    HybridMethodModel championHybridMethodModel = getModelForDecisionVector(championDesignVariables_);
+    std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> hybridChampionTrajectory = championHybridMethodModel.getTrajectoryOutput();
+
+    // Temporary stuff to directly store the dependent variable history (hopefully containing thrust acceleration profile)
+    std::cout << "Exporting Optimization Results" << std::endl;
+
+
+
+    input_output::writeDataMapToTextFile(hybridFitnessResults,
+                                         "HybridFitnessResults.dat",
+                                         outputDirectory,
+                                         "",
+                                         std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                         ",");
+    input_output::writeDataMapToTextFile(hybridErrorResults,
+                                         "HybridErrorResults.dat",
+                                         outputDirectory,
+                                         "",
+                                         std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                         ",");
+    input_output::writeDataMapToTextFile(hybridChampionTrajectory.first,
+                                         "HybridChampionTrajectory.dat",
+                                         outputDirectory,
+                                         "",
+                                         std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                         ",");
+    input_output::writeDataMapToTextFile(hybridChampionTrajectory.second,
+                                         "HybridChampionDependentVariableHistory.dat",
+                                         outputDirectory,
+                                         "",
+                                         std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                         ",");
 
     std::pair< std::vector< double >, std::vector< double > > output;
     output.first = championFitness_;

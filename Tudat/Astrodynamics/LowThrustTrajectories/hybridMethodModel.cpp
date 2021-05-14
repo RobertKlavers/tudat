@@ -287,7 +287,7 @@ std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd
     return std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> (integrationResult, dependentVariableResult);
 }
 
-std::pair<std::vector<double>, Eigen::Vector6d> HybridMethodModel::calculateFitness() {
+std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::calculateFitness() {
     // Propagate until time of flight is reached.
     Eigen::Vector6d finalPropagatedState = propagateTrajectory( );
 
@@ -319,8 +319,8 @@ std::pair<std::vector<double>, Eigen::Vector6d> HybridMethodModel::calculateFitn
     epsilon_upper(4) = hybridOptimisationSettings_->epsilonUpper_(4) * deg2rad,
     epsilon_upper(5) = hybridOptimisationSettings_->epsilonUpper_(5) * deg2rad;
 
-    // Aggregate Objective Function (epsilons + tof + mass)
-    std::vector<double> aof_vector;
+    // Aggregate Objective Function (6 epsilons + tof + mass)
+    Eigen::VectorXd aof_vector(8);
 
     // 5 for no longitude targeting?
     for ( int i = 0 ; i < 6 ; i++ )
@@ -331,21 +331,17 @@ std::pair<std::vector<double>, Eigen::Vector6d> HybridMethodModel::calculateFitn
     }
     // Determine scaled epsilon at TOF
     for ( int i = 0 ; i < 6 ; i++) {
-        aof_vector.push_back(hybridOptimisationSettings_->constraintWeights_[i] * epsilon[i] * epsilon[i]);
+        aof_vector(i) = (hybridOptimisationSettings_->constraintWeights_[i] * epsilon[i] * epsilon[i]);
     }
 
     // AOF From Jimenez: F = sum(orbit error) + W_t*t_f + W_m*(1 - m_f/m_0)
     double finalMass = getMassAtTimeOfFlight();
-    aof_vector.push_back(hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_);
-    aof_vector.push_back(hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
+    aof_vector(6) = (hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_/physical_constants::JULIAN_DAY);
+    aof_vector(7) = (hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
 
     // Some debugging statements we don't actually directly output the fitness
     if (hybridOptimisationSettings_->debug_) {
-        double totalEps = 0.0;
-        for (auto& n : aof_vector) {
-            totalEps+= n;
-        }
-
+        double totalEps = aof_vector.sum();
         std::cout << "\n\n--fitcalc--" << std::endl;
         std::cout << "  cfu:" << costatesFunction_(0.0).transpose() << "] | [" << costatesFunction_(timeOfFlight_).transpose() << std::endl;
         std::cout << "  x_f: " << finalPropagatedState.transpose() << std::endl;
