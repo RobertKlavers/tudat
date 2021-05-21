@@ -90,28 +90,17 @@ void MeeCostateBasedThrustGuidance::updateForceDirection( const double time )
         // since both denominators are the same.
         double thrustAngleBeta = std::atan2( Lbf3 - Lbg3 - Lbh - Lbk, - Lbp - Lbf1 - Lbf2 + Lbg1 - Lbg2 );
 
-        // Calculate thrust direction
-        currentForceDirection_ = reference_frames::getVelocityBasedLvlhToInertialRotation(
-                    currentState, Eigen::Vector6d::Zero( ), false ) *
-                ( ( Eigen::Vector3d( ) <<
-                    cos( thrustAngleAlpha ) * cos( thrustAngleBeta ), sin( thrustAngleAlpha ) * cos( thrustAngleBeta ) ,
-                    sin( thrustAngleBeta )  ).finished( ).normalized( ) );
+        // The thrust angles are given in the RSW frame, where alpha is w.r.t. the S direction (perpendicular to the
+        // radius vectory in the direction of the velocity.
+        Eigen::Vector3d currentRSWForceDirection = (Eigen::Vector3d() <<
+            sin(thrustAngleAlpha) * cos(thrustAngleBeta),
+            cos(thrustAngleAlpha) * cos(thrustAngleBeta),
+            sin(thrustAngleBeta)
+        ).finished().normalized();
+        Eigen::Matrix3d intertialToRswRotMat = reference_frames::getInertialToRswSatelliteCenteredFrameRotationMatrix(currentState);
+
+        currentForceDirection_ = intertialToRswRotMat.transpose() * currentRSWForceDirection;
         currentTime_ = time;
-
-
-//        // Switching function for the thrust magnitude.
-//        double thrustMagnitudeSwitchingCondition = /*( 1.0 / thrustingBodyMassFunction_( ) ) **/
-//                ( Lbp * cos( thrustAngleBeta ) + Lbh * sin( thrustAngleBeta ) + Lbk * sin( thrustAngleBeta )
-//                + Lbf1 * cos( thrustAngleBeta ) + Lbf2 * cos( thrustAngleBeta ) - Lbf3 * sin( thrustAngleBeta )
-//                - Lbg1 * cos( thrustAngleBeta ) + Lbg2 * cos( thrustAngleBeta ) + Lbg3 * sin( thrustAngleBeta ) );
-//        if ( thrustMagnitudeSwitchingCondition <= 0.0 )
-//        {
-//            std::cout << "INSIDE THRUST DIRECTION FUNCTION, THRUST ON. " << "\n\n";
-//        }
-//        else
-//        {
-//            std::cout << "INSIDE THRUST DIRECTION FUNCTION, THRUST OFF. " << "\n\n";
-//        }
     }
 
 }
