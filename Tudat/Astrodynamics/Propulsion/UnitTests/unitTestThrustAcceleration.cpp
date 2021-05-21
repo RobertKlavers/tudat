@@ -1896,54 +1896,55 @@ BOOST_AUTO_TEST_CASE( testMeeCostateBasedThrust )
                 dependentVariableSolution.begin( )->second.segment( 0, 6 );
 
         // Test whether MEE rates are within reasonable bounds (values are determined empirically)
-        BOOST_CHECK_EQUAL( ( finalModifiedEquinoctialElementsError( i ) < 0 ), true );
+        // BOOST_CHECK_EQUAL( ( finalModifiedEquinoctialElementsError( i ) < 0 ), true );
+        BOOST_CHECK_LT(finalModifiedEquinoctialElementsError( i ), 0);
         if( i == 0 )
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 0 ) ) > 2.5E6 ), true );
+            BOOST_CHECK_GT(std::fabs(finalModifiedEquinoctialElementsError(0)), 2.5e6);
         }
         else if( i < 3 )
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 0 ) ) < 2E5 ), true );
+            BOOST_CHECK_LT(std::fabs(finalModifiedEquinoctialElementsError(0)),  2e5 );
         }
         else
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 0 ) ) < 0.1 ), true );
+            BOOST_CHECK_LT(std::fabs(finalModifiedEquinoctialElementsError(0)), 0.1 );
         }
 
         if( i == 1 )
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 1 ) ) > 0.1 ), true );
+            BOOST_CHECK_GT(std::fabs(finalModifiedEquinoctialElementsError(1)), 0.1 );
         }
         else
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 1 ) ) < 0.025 ), true );
+            BOOST_CHECK_LT(std::fabs(finalModifiedEquinoctialElementsError(1)), 0.025 );
         }
 
         if( i == 2 )
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 2 ) ) > 0.1 ), true );
+            BOOST_CHECK_GT(std::fabs(finalModifiedEquinoctialElementsError(2)), 0.1 );
         }
         else
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 2 ) ) < 0.025 ), true );
+            BOOST_CHECK_LT(std::fabs(finalModifiedEquinoctialElementsError(2)), 0.025 );
         }
 
         if( i == 3 )
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 3 ) ) > 0.075 ), true );
+            BOOST_CHECK_GT(std::fabs(finalModifiedEquinoctialElementsError(3)), 0.075 );
         }
         else
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 3 ) ) < 0.005 ), true );
+            BOOST_CHECK_LT(std::fabs(finalModifiedEquinoctialElementsError(3)), 0.005 );
         }
 
         if( i == 4 )
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 4 ) ) > 0.075 ), true );
+            BOOST_CHECK_GT(std::fabs(finalModifiedEquinoctialElementsError(4)), 0.075 );
         }
         else
         {
-            BOOST_CHECK_EQUAL( ( std::fabs( finalModifiedEquinoctialElementsError( 4 ) ) < 0.005 ), true );
+            BOOST_CHECK_LT(std::fabs(finalModifiedEquinoctialElementsError(4)), 0.005 );
         }
     }
 }
