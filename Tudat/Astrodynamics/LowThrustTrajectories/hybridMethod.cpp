@@ -44,6 +44,20 @@ HybridMethodModel HybridMethod::getModelForDecisionVector(std::vector<double> de
         finalCostates( i ) = designVector[ i+1 + 6 ];
     }
 
+    // Scale the semi-parameter costate to ensure design vector is similar in order of magnitude
+    double centralBodyGravitationalParameter = bodyMap_.at( centralBody_ )->getGravityFieldModel( )->getGravitationalParameter( );
+
+    double initialSemiParameter =
+            orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
+                    stateAtDeparture_, centralBodyGravitationalParameter, false )[0];
+
+    double finalSemiParameter =
+            orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
+                    stateAtArrival_, centralBodyGravitationalParameter, false )[0];
+
+    initialCostates(1) = initialCostates(1) / initialSemiParameter;
+    initialCostates(1 + 6) = initialCostates(1 + 6) / finalSemiParameter;
+
     // Make sure to reset the initial Mass
     bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass(initialMass_);
 
