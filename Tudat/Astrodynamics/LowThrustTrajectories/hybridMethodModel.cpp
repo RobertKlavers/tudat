@@ -200,7 +200,7 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
         massAtTimeOfFlight_ = propagationOriginalResult[ 6 ];
     }
 
-    return std::pair<Eigen::Vector6d, Eigen::Vector6d> (propagatedState, computedMMEStateDerivatives);
+    return {propagatedState, computedMMEStateDerivatives};
 }
 
 //! Propagate the trajectory to set of epochs.
