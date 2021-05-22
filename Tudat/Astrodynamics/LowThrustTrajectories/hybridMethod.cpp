@@ -64,7 +64,8 @@ HybridMethodModel HybridMethod::getModelForDecisionVector(std::vector<double> de
     // Create hybrid method leg.
     HybridMethodModel hybridMethodModel = HybridMethodModel(
             stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_,
-            specificImpulse_, timeOfFlight, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_ );
+            specificImpulse_, timeOfFlight, bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_,
+            hybridOptimisationSettings_, useConstantThrust_, useOrbitalAveraging_);
     return hybridMethodModel;
 }
 

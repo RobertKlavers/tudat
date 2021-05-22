@@ -28,28 +28,36 @@ class HybridMethodModel
 public:
 
     //! Constructor.
-    HybridMethodModel( const Eigen::Vector6d& stateAtDeparture,
-                     const Eigen::Vector6d& stateAtArrival,
-                     const Eigen::VectorXd& initialCoStates,
-                     const Eigen::VectorXd& finalCoStates,
-                     const double maximumThrust,
-                     const double specificImpulse,
-                     const double timeOfFlight,
-                     simulation_setup::NamedBodyMap& bodyMap,
-                     const std::string bodyToPropagate,
-                     const std::string centralBody,
-                     std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
-                     std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings ):
-    stateAtDeparture_( stateAtDeparture ), stateAtArrival_( stateAtArrival ), initialCoStates_( initialCoStates ),
-    finalCoStates_( finalCoStates ), maximumThrust_( maximumThrust ),
-    specificImpulse_( specificImpulse ),
-    timeOfFlight_( timeOfFlight ),
-    bodyMap_( bodyMap ),
-    bodyToPropagate_( bodyToPropagate ),
-    centralBody_( centralBody ),
-    integratorSettings_( integratorSettings ),
-    hybridOptimisationSettings_( hybridOptimisationSettings )
-    {
+    HybridMethodModel(const Eigen::Vector6d &stateAtDeparture,
+                      const Eigen::Vector6d &stateAtArrival,
+                      const Eigen::VectorXd &initialCoStates,
+                      const Eigen::VectorXd &finalCoStates,
+                      const double maximumThrust,
+                      const double specificImpulse,
+                      const double timeOfFlight,
+                      simulation_setup::NamedBodyMap &bodyMap,
+                      const std::string bodyToPropagate,
+                      const std::string centralBody,
+                      std::shared_ptr<numerical_integrators::IntegratorSettings<double>> integratorSettings,
+                      std::shared_ptr<simulation_setup::HybridOptimisationSettings> hybridOptimisationSettings,
+                      const bool useOrbitalAveraging = false,
+                      const bool useConstantThrust = true
+    ):
+            stateAtDeparture_(stateAtDeparture),
+            stateAtArrival_(stateAtArrival),
+            initialCoStates_(initialCoStates),
+            finalCoStates_(finalCoStates),
+            maximumThrust_(maximumThrust),
+            specificImpulse_(specificImpulse),
+            timeOfFlight_(timeOfFlight),
+            bodyMap_(bodyMap),
+            bodyToPropagate_(bodyToPropagate),
+            centralBody_(centralBody),
+            integratorSettings_(integratorSettings),
+            hybridOptimisationSettings_(hybridOptimisationSettings),
+            useOrbitalAveraging_(useOrbitalAveraging),
+            useConstantThrust_(useConstantThrust)
+        {
         // Initialise value of the total deltaV.
         totalDeltaV_ = 0.0;
 
@@ -210,6 +218,8 @@ private:
     //! Mass of the spacecraft at the end of the propagation.
     double massAtTimeOfFlight_;
 
+    bool useOrbitalAveraging_;
+    bool useConstantThrust_;
 };
 
 

@@ -76,9 +76,9 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethodProblem::g
     // Define upper bounds.
     std::vector< double > upperBounds;
 
-    //TODO TEMPORARILY SET THE BOUNDS FOR TOF HERE!
+    //TODO Add ability to set lower bound for time of flight
     lowerBounds.push_back(0.0);
-    upperBounds.push_back(5.0 * physical_constants::JULIAN_DAY);
+    upperBounds.push_back(timeOfFlight_);
 
     if ( guessInitialAndFinalCostates_.size( ) != 0 )
     {

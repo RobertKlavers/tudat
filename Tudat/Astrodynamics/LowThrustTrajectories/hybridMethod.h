@@ -48,8 +48,11 @@ public:
             std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
             std::shared_ptr< simulation_setup::OptimisationSettings > optimisationSettings,
             const std::pair< double, double > initialAndFinalMEEcostatesBounds,
-            std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings):
-        LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, initialSpacecraftMass, true ),
+            std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings,
+            const bool useOrbitalAveraging = false,
+            const bool useConstantThrust = true
+            ):
+        LowThrustLeg( stateAtDeparture, stateAtArrival, timeOfFlight, initialSpacecraftMass, false ),
         centralBodyGravitationalParameter_( centralBodyGravitationalParameter ),
         bodyMap_( bodyMap ),
         bodyToPropagate_( bodyToPropagate ),
@@ -59,7 +62,9 @@ public:
         integratorSettings_( integratorSettings ),
         optimisationSettings_( optimisationSettings ),
         initialAndFinalMEEcostatesBounds_( initialAndFinalMEEcostatesBounds ),
-        hybridOptimisationSettings_( hybridOptimisationSettings )
+        hybridOptimisationSettings_( hybridOptimisationSettings ),
+        useOrbitalAveraging_(useOrbitalAveraging),
+        useConstantThrust_(useConstantThrust)
     {
 
         // Convert the thrust model proposed as initial guess into simplified thrust model adapted to the hybrid method.
@@ -103,7 +108,7 @@ public:
         // Create Hybrid leg from the best optimisation individual.
         hybridMethodModel_ = std::make_shared< HybridMethodModel >(
                     stateAtDeparture_, stateAtArrival_, initialCostates, finalCostates, maximumThrust_, specificImpulse_, tofDecVec,
-                    bodyMap_, bodyToPropagate_, centralBody_, integratorSettings, hybridOptimisationSettings_ );
+                    bodyMap_, bodyToPropagate_, centralBody_, integratorSettings_, hybridOptimisationSettings_, useOrbitalAveraging_, useConstantThrust_ );
 
     }
 
@@ -252,6 +257,10 @@ private:
     std::shared_ptr< simulation_setup::HybridOptimisationSettings > hybridOptimisationSettings_;
 
     HybridMethodModel getModelForDecisionVector(std::vector<double> designVector);
+
+    bool useOrbitalAveraging_;
+
+    bool useConstantThrust_;
 };
 
 
