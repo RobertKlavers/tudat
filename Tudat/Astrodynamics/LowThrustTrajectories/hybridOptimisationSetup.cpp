@@ -119,7 +119,8 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     std::vector< double > fitness;
 
     if (hybridOptimisationSettings_->debug_) {
-        std::cout << "fit: [";
+        std::cout << "\n--prob.fitfunc--" << std::endl;
+        std::cout << "  y_vec: [";
         for (auto& n: designVariables) {
             std::cout << n << ", ";
         }
@@ -157,14 +158,16 @@ std::vector< double > HybridMethodProblem::fitness( const std::vector< double > 
     double totalEpsilon = fitnessResults.first.sum();
 
     if (hybridOptimisationSettings_->debug_) {
-        std::cout << "f: "<< totalEpsilon;
-        std::cout << ", eps: [" << fitnessResults.first.transpose() << "]" << std::endl;
+        std::cout << "  f: "<< totalEpsilon << std::endl;
+        std::cout << "  eps: [" << fitnessResults.first.transpose() << "]" << std::endl;
         std::cout << "  err: [" << fitnessResults.second.transpose() << "]" << std::endl;
         std::cout << "  cst: [" << initialCostates.transpose() << "] | [" << finalCostates.transpose() << "]" << std::endl;
-        for (int j = 0; j < 6; j++) {
-            std::cout << "[" << designVariables[j+1] << ", " << designVariables[j+1 + 6] << "], ";
+        std::cout << "  dvc: [" << (designVariables[0]/physical_constants::JULIAN_DAY) << "], ";
+        for (int j = 1; j < 7; j++) {
+            std::cout << "[" << designVariables[j] << ", " << designVariables[j + 6] << "], ";
         }
         std::cout << "(" << designVariables.size() << ")" << std::endl;
+        std::cout << "--end.prob--" << std::endl;
     }
     // Output of the fitness function..
     fitness.push_back( totalEpsilon );

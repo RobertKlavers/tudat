@@ -173,9 +173,6 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
 //! Propagate the spacecraft trajectory to time-of-flight.
 Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
 {
-    if (hybridOptimisationSettings_->debug_) {
-        std::cout << "    |" << timeOfFlight_ << "," << stateAtDeparture_.transpose()<< "," << initialSpacecraftMass_ << std::endl;
-    }
     Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
     return propagatedState;
 }
@@ -288,6 +285,10 @@ std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd
 }
 
 std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::calculateFitness() {
+    if (hybridOptimisationSettings_->debug_) {
+        std::cout << "  --mod.fitcalc--" << std::endl;
+    }
+
     // Propagate until time of flight is reached.
     Eigen::Vector6d finalPropagatedState = propagateTrajectory( );
 
@@ -342,11 +343,11 @@ std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::calculateFitness(
     // Some debugging statements we don't actually directly output the fitness
     if (hybridOptimisationSettings_->debug_) {
         double totalEps = aof_vector.sum();
-        std::cout << "\n\n--fitcalc--" << std::endl;
-        std::cout << "  cfu:" << costatesFunction_(0.0).transpose() << "] | [" << costatesFunction_(timeOfFlight_).transpose() << std::endl;
-        std::cout << "  x_f: " << finalPropagatedState.transpose() << std::endl;
-        std::cout << "  err:" << error.transpose() << std::endl;
-        std::cout << "  sum_e: " << totalEps << std::endl;
+        std::cout << "    cfun : [" << costatesFunction_(0.0).transpose() << "] | [" << costatesFunction_(timeOfFlight_).transpose() << "]" << std::endl;
+        std::cout << "    x_f  : " << finalPropagatedState.transpose() << std::endl;
+        std::cout << "    err  :" << error.transpose() << std::endl;
+        std::cout << "    sum_e: " << totalEps << std::endl;
+        std::cout << "  --end.model--" << std::endl;
     }
     return {aof_vector, error};
 }

@@ -77,6 +77,8 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
 
     std::string outputDirectory = "/home/robert/tud/thesis/analysis/data/hybridResults/";
 
+    clock_t time_req;
+
     // Create object to compute the problem fitness
     problem prob{
             HybridMethodProblem(stateAtDeparture_, stateAtArrival_, maximumThrust_, specificImpulse_, timeOfFlight_,
@@ -100,10 +102,12 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
 
     std::map<int, Eigen::VectorXd> hybridFitnessResults;
     std::map<int, Eigen::Vector6d> hybridErrorResults;
+    std::map<int, Eigen::VectorXd> hybridChampionDesignVectors;
 
     // // Evolve for N generations
     for( int gen = 0 ; gen < optimisationSettings_->numberOfGenerations_ ; gen++ )
     {
+        time_req = clock();
         // Evolve the current population
         island.evolve( );
         while( island.status( ) != pagmo::evolve_status::idle &&
@@ -113,29 +117,43 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
         }
         // island.wait_check( ); // Raises errors
         // Get the best individual of this generation
-        std::vector<double> championDesignVector = island.get_population().champion_x();
+        std::vector<double> currentChampionDecisionVector = island.get_population().champion_x();
+        double currentChampionFitness = island.get_population().champion_f()[0];
+
+        time_req = clock() - time_req;
+        // Print results
+        std::cout << "\n==== gen: " << gen << ", f: " << currentChampionFitness << ", t: "  << (float)time_req/CLOCKS_PER_SEC << " s ====" << std::endl;
 
         // Make sure to reset the initial Mass
         bodyMap_[ bodyToPropagate_ ]->setConstantBodyMass(initialMass_);
 
-        HybridMethodModel currentHybridMethodModel = getModelForDecisionVector(championDesignVector);
+        HybridMethodModel currentHybridMethodModel = getModelForDecisionVector(currentChampionDecisionVector);
 
         std::pair<Eigen::VectorXd, Eigen::Vector6d> fitnessResults = currentHybridMethodModel.calculateFitness();
         std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> currentBestTrajectory = currentHybridMethodModel.getTrajectoryOutput();
 
         hybridFitnessResults[gen] = fitnessResults.first;
         hybridErrorResults[gen] = fitnessResults.second;
+        hybridChampionDesignVectors[gen] = Eigen::VectorXd::Map(currentChampionDecisionVector.data(), currentChampionDecisionVector.size());
 
-        double rad2deg = 180.0 /  mathematical_constants::PI;
+        // double rad2deg = 180.0 /  mathematical_constants::PI;
 
-        Eigen::Vector6d error_vec;
-        error_vec <<
-            fitnessResults.second(0),
-            fitnessResults.second(1),
-            fitnessResults.second(2) * rad2deg,
-            fitnessResults.second(3) * rad2deg,
-            fitnessResults.second(4) * rad2deg,
-            fitnessResults.second(5) * rad2deg;
+        // Eigen::Vector6d error_vec;
+        // error_vec <<
+        //     fitnessResults.second(0),
+        //     fitnessResults.second(1),
+        //     fitnessResults.second(2) * rad2deg,
+        //     fitnessResults.second(3) * rad2deg,
+        //     fitnessResults.second(4) * rad2deg,
+        //     fitnessResults.second(5) * rad2deg;
+
+        std::cout << "  best: [";
+        for (auto& n: currentChampionDecisionVector) {
+            std::cout << n << ", ";
+        }
+        std::cout << "] (" << currentChampionDecisionVector.size() << ")" << std::endl;
+        std::cout << "  eps: [" << fitnessResults.first.transpose() << "] (" << fitnessResults.first.sum() << ")" << std::endl;
+        std::cout << "  err: [" << fitnessResults.second.transpose() << "]" <<std::endl;
 
         input_output::writeDataMapToTextFile(currentBestTrajectory.first,
                                              "HybridCurrentBestTrajectory.dat",
@@ -149,16 +167,6 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
                                              "",
                                              std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
                                              ",");
-
-        // Print results
-        std::cout << "\n==== gen: " << gen << ", f: " << island.get_population().champion_f()[0] << " ====" << std::endl;
-        std::cout << "  best: [" << (championDesignVector[0]/physical_constants::JULIAN_DAY) << "], ";
-        for (int j = 1; j < 7; j++) {
-            std::cout << "[" << championDesignVector[j] << ", " << championDesignVector[j + 6] << "], ";
-        }
-        std::cout << "(" << championDesignVector.size() << ")" << std::endl;
-        std::cout << "  eps: [" << fitnessResults.first.transpose() << "]" << std::endl;
-        std::cout << "  err: [" << error_vec.transpose() << "]" <<std::endl;
     }
 
     championFitness_ = island.get_population().champion_f();
@@ -196,12 +204,15 @@ std::pair< std::vector< double >, std::vector< double > > HybridMethod::performO
                                          "",
                                          std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
                                          ",");
+    input_output::writeDataMapToTextFile(hybridChampionDesignVectors,
+                                         "HybridChampionDesignVectors.dat",
+                                         outputDirectory,
+                                         "",
+                                         std::numeric_limits<double>::digits10, std::numeric_limits<double>::digits10,
+                                         ",");
 
-    std::pair< std::vector< double >, std::vector< double > > output;
-    output.first = championFitness_;
-    output.second = championDesignVariables_;
 
-    return output;
+    return {championFitness_, championDesignVariables_};
 
 }
 
