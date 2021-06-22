@@ -521,7 +521,20 @@ std::shared_ptr< PropagationTerminationDetails > integrateEquationsFromIntegrato
 
                 // Update epoch and step-size
                 currentTime = integrator->getCurrentIndependentVariable( );
-                timeStep = integrator->getNextStepSize( );
+
+                // TODO: Workaround to determine the time step based on a fixed step in true anomaly, as used for the hybrid
+                //  method. This should be extracted reworked when integratiuon is refactored.
+                // Use the approximation dtheta/dt ≈ n*a / r, delta t = delta theta * dt/dtheta, assuming stateVector is
+                // given in MEE
+
+                double gravitationalParameter = 3.98600441e14;
+
+                Eigen::VectorXd stateVector = newState.col(0);
+
+                double radius = stateVector[0] / (1 + stateVector[1] * cos(stateVector[5]) + stateVector[2] * sin(stateVector[5]));
+                double semi_major_axis = stateVector[0] / (1 - std::pow(stateVector[1], 2) - std::pow(stateVector[2], 2));
+
+                timeStep = initialTimeStep * (radius / (semi_major_axis * std::sqrt(gravitationalParameter / std::pow(semi_major_axis, 3.0))));
 
                 // Save integration result in map
                 saveIndex++;
