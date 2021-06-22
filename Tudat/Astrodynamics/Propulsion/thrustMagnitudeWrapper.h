@@ -265,17 +265,23 @@ public:
     {
         if( !( currentTime_ == time ) )
         {
-
+            currentSpecificImpulse_ = specificImpulseFunction_( time );
             Eigen::VectorXd costates_ = costateFunction_( time );
 
+            Eigen::Vector6d thrustBodyState = thrustingBodyStateFunction_( );
+            Eigen::Vector6d centralBodyState = centralBodyStateFunction_( );
+
             // Get the current state in cartesian coordinates and keplerian elements, and some convenient parameters
-            Eigen::Vector6d currentState = thrustingBodyStateFunction_( ) - centralBodyStateFunction_( );
+            Eigen::Vector6d currentState = thrustBodyState - centralBodyState;
             double centralBodyGravitationalParameter = centralBodyGravitationalParameterFunction_( );
 
             // Obtain ModifiedEquinoctial elements, flag of 0 indicates that singularity occurs at 180 deg inclination.
             Eigen::Vector6d modifiedEquinoctialElements =
                     orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
                         currentState, centralBodyGravitationalParameter, 0 );
+
+            double currentMass = thrustingBodyMassFunction_();
+            double currentSpecificImpulse =  specificImpulseFunction_( time );
 
             // Retrieve modified equinoctial elements.
             double p = modifiedEquinoctialElements[ orbital_element_conversions::semiParameterIndex ];
@@ -288,80 +294,66 @@ public:
             double w1 = 1.0 + f * std::cos( L ) + g * std::sin( L );
             double w2 = 1.0 + h * h + k * k;
 
+            double lp = costates_[0];
+            double lf = costates_[1];
+            double lg = costates_[2];
+            double lh = costates_[3];
+            double lk = costates_[4];
+            double lm = costates_[5];
+
             // Compute all required auxiliary variables to compute optimal angle alpha.
-            double lambdap = costates_[ orbital_element_conversions::semiParameterIndex ] * ( 2.0 * p ) / w1;
-            double lambdaf1 = costates_[ orbital_element_conversions::fElementIndex ] * std::sin( L );
-            double lambdag1 = costates_[ orbital_element_conversions::gElementIndex ] * std::cos( L );
-            double lambdaf2 = costates_[ orbital_element_conversions::fElementIndex ] / w1 *
-                    ( ( w1 + 1.0 ) * std::cos( L ) + f );
-                    //costates_[ orbital_element_conversions::fElementIndex ] * ( ( w1 + 1.0 ) * std::cos( L ) + f ) / w1;
-            double lambdag2 = costates_[ orbital_element_conversions::gElementIndex ] / w1 * ( ( w1 + 1.0 ) * std::sin( L ) + g );
+            double lambdaAp = lp * ( 2.0 * p ) / w1;
+            double lambdaAf1 = lf * std::sin( L );
+            double lambdaAg1 = lg * std::cos( L );
+            double lambdaAf2 = lf / w1 * ( ( w1 + 1.0 ) * std::cos( L ) + f );
+            double lambdaAg2 = lg / w1 * ( ( w1 + 1.0 ) * std::sin( L ) + g );
 
-
-
-            // Compute sinus of the optimal value of angle alpha.
-            double sinOptimalAlpha = - ( lambdaf1 - lambdag1 ) /
-                    std::sqrt( ( lambdaf1 - lambdag1 ) * ( lambdaf1 - lambdag1 ) +
-                               ( lambdap + lambdaf2 + lambdag2 ) * ( lambdap + lambdaf2 + lambdag2 ) );
-
-            // Compute cosinus of the optimal value of angle alpha.
-            double cosOptimalAlpha = - ( lambdap + lambdaf2 + lambdag2 ) /
-                    std::sqrt( ( lambdaf1 - lambdag1 ) * ( lambdaf1 - lambdag1 ) +
-                               ( lambdap + lambdaf2 + lambdag2 ) * ( lambdap + lambdaf2 + lambdag2 ) );
+            double optimalAlpha = std::atan2(- ( lambdaAf1 - lambdaAg1 ), - ( lambdaAp + lambdaAf2 + lambdaAg2 ));
+            double sinOptimalAlpha = sin(optimalAlpha);
+            double cosOptimalAlpha = cos(optimalAlpha);
 
             // Compute all required auxiliary variables to compute optimal angle beta.
-            lambdap = costates_[ orbital_element_conversions::semiParameterIndex ] * ( 2.0 * p ) / w1 * cosOptimalAlpha;
-            lambdaf1 = costates_[ orbital_element_conversions::fElementIndex ] * std::sin( L ) * sinOptimalAlpha;
-            lambdag1 = costates_[ orbital_element_conversions::gElementIndex ] * std::cos( L ) * sinOptimalAlpha;
-            lambdaf2 = costates_[ orbital_element_conversions::fElementIndex ] * ( ( 1.0 + w1 ) * std::cos( L ) + f ) / w1 * cosOptimalAlpha;
-            lambdag2 = costates_[ orbital_element_conversions::gElementIndex ] * ( ( 1.0 + w1 ) * std::sin( L ) + g ) / w1 * cosOptimalAlpha;
-            double lambdaf3 = costates_[ orbital_element_conversions::fElementIndex ] * ( g / w1 ) * ( h * std::sin( L ) - k * std::cos( L ) );
-            double lambdag3 = costates_[ orbital_element_conversions::gElementIndex ] * ( f / w1 ) * ( h * std::sin( L ) - k * std::cos( L ) );
-            double lambdah = costates_[ orbital_element_conversions::hElementIndex ] * ( w2 * std::cos( L ) ) / ( 2.0 * w1 );
-            double lambdak = costates_[ orbital_element_conversions::kElementIndex ] * ( w2 * std::sin( L ) ) / ( 2.0 * w1 );
+            double lambdaBp  = lp * ( 2.0 * p ) / w1 * cosOptimalAlpha;
+            double lambdaBf1 = lf * std::sin( L ) * sinOptimalAlpha;
+            double lambdaBg1 = lg * std::cos( L ) * sinOptimalAlpha;
+            double lambdaBf2 = lf * ( ( 1.0 + w1 ) * std::cos( L ) + f ) / w1 * cosOptimalAlpha;
+            double lambdaBg2 = lg * ( ( 1.0 + w1 ) * std::sin( L ) + g ) / w1 * cosOptimalAlpha;
+            double lambdaBf3 = lf * ( g / w1 ) * ( h * std::sin( L ) - k * std::cos( L ) );
+            double lambdaBg3 = lg * ( f / w1 ) * ( h * std::sin( L ) - k * std::cos( L ) );
+            double lambdaBh  = lh * ( w2 * std::cos( L ) ) / ( 2.0 * w1 );
+            double lambdaBk  = lk * ( w2 * std::sin( L ) ) / ( 2.0 * w1 );
 
-            // Compute sinus of optimal thrust angle beta.
-            double sinOptimalBeta = - ( - lambdaf3 + lambdag3 + lambdah + lambdak ) /
-                    std::sqrt( ( - lambdaf3 + lambdag3 + lambdah + lambdak ) * ( - lambdaf3 + lambdag3 + lambdah + lambdak )
-                               + ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 )
-                               * ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 ) );
+            double optimalBeta = std::atan2(- ( - lambdaBf3 + lambdaBg3 + lambdaBh + lambdaBk ), - ( lambdaBp + lambdaBf1 - lambdaBg1 + lambdaBf2 + lambdaBg2 ));
+            double sinOptimalBeta = sin(optimalBeta);
+            double cosOptimalBeta = cos(optimalBeta);
 
-            // Compute cosinus of optimal thrust angle beta.
-            double cosOptimalBeta = - ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 ) /
-                    std::sqrt( ( - lambdaf3 + lambdag3 + lambdah + lambdak ) * ( - lambdaf3 + lambdag3 + lambdah + lambdak )
-                               + ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 )
-                               * ( lambdap + lambdaf1 - lambdag1 + lambdaf2 + lambdag2 ) );
+            double thrustMagLeft = (1.0 / currentMass) *
+                                   (lambdaBp * cosOptimalBeta +
+                                    lambdaBh * sinOptimalBeta +
+                                    lambdaBk * sinOptimalBeta +
+                                    lambdaBf1 * cosOptimalBeta +
+                                    lambdaBf2 * cosOptimalBeta -
+                                    lambdaBf3 * sinOptimalBeta -
+                                    lambdaBg1 * cosOptimalBeta +
+                                    lambdaBg2 * cosOptimalBeta +
+                                    lambdaBg3 * sinOptimalBeta);
 
-            double lambdam = costates_[5];
+            double thrustMagRight = lm * 1.0 / ( currentSpecificImpulse * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION);
 
             // Switching function for the thrust magnitude.
-            double thrustMagnitudeSwitchingCondition = (1.0 / thrustingBodyMassFunction_()) *
-                                                       (lambdap * cosOptimalBeta +
-                                                        lambdah * sinOptimalBeta +
-                                                        lambdak * sinOptimalBeta +
-                                                        lambdaf1 * cosOptimalBeta +
-                                                        lambdaf2 * cosOptimalBeta -
-                                                        lambdaf3 * sinOptimalBeta -
-                                                        lambdag1 * cosOptimalBeta +
-                                                        lambdag2 * cosOptimalBeta +
-                                                        lambdag3 * sinOptimalBeta)
-                                                       - lambdam * 1.0 /
-                                                         (currentSpecificImpulse_ * centralBodyGravitationalParameter);
-
+            double thrustMagnitudeSwitchingCondition = thrustMagLeft - thrustMagRight;
 
             // Compute current thrust magnitude and specific impulse.
-            if ( thrustMagnitudeSwitchingCondition <= 0.0 )
+            // TODO: Find a better way to handle NaN issues
+            if ( isnan(thrustMagnitudeSwitchingCondition) || thrustMagnitudeSwitchingCondition > 0.0 )
             {
-               // std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST ON. " << "\n";
-                currentThrustMagnitude_ = maximumThrustMagnitude_;
+                currentThrustMagnitude_ = 0.0;
             }
             else
             {
-               // std::cout << "INSIDE THRUST MAGNITUDE FUNCTION, THRUST OFF. " << "\n";
-                currentThrustMagnitude_ = 0.0;
+                currentThrustMagnitude_ = maximumThrustMagnitude_;
 
             }
-            currentSpecificImpulse_ = specificImpulseFunction_( time );
 
             currentTime_ = time;
         }
