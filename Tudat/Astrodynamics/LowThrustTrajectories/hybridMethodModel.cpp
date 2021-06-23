@@ -256,13 +256,12 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
 
 //! Utility to retrieve the integration result and all saved dependent variables
 std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> HybridMethodModel::getTrajectoryOutput() {
-    std::shared_ptr<numerical_integrators::IntegratorSettings<double> > integratorSettings =
-            std::make_shared<numerical_integrators::IntegratorSettings<double> >
-                    (numerical_integrators::rungeKutta4, 0.0, 60.0);
-
-    propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_, integratorSettings, true);
+    propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_, integratorSettings_, false);
     std::map< double, Eigen::VectorXd > integrationResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( );
     std::map< double, Eigen::VectorXd > dependentVariableResult = dynamicsSimulator.getDependentVariableHistory( );
+
+    Eigen::VectorXd finalPropagatedState = integrationResult.rbegin( )->second;
+    massAtTimeOfFlight_ = finalPropagatedState[6];
 
     // index to denote where the thrust accelerations start in the dependent variable history.
     int thrustIndex = 6;
@@ -330,22 +329,29 @@ std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::calculateFitness(
         r[ i ] = 1.0 - epsilon_upper(i) * c[ i ];
         epsilon[ i ] = error[ i ] * c[ i ] + r[ i ];
     }
-    // Determine scaled epsilon at TOF
+
+    // Create vector with individual contributions to objective function
+    // Using AOF From (D. Jimenez, 2020): F = sum(W_j*epsilon_j^2) + W_t*t_f + W_m*(1 - m_f/m_0)
     for ( int i = 0 ; i < 6 ; i++) {
         aof_vector(i) = (hybridOptimisationSettings_->constraintWeights_[i] * epsilon[i] * epsilon[i]);
     }
 
-    // AOF From Jimenez: F = sum(orbit error) + W_t*t_f + W_m*(1 - m_f/m_0)
+    // Time of flight contribution (t_f should be in days)
+    double epsTimeOfFlight = (hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_/physical_constants::JULIAN_DAY);
+    aof_vector(6) = epsTimeOfFlight;
+
+    // Final mass contribution
     double finalMass = getMassAtTimeOfFlight();
-    aof_vector(6) = (hybridOptimisationSettings_->weightTimeOfFlight_ * timeOfFlight_/physical_constants::JULIAN_DAY);
-    aof_vector(7) = (hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
+    double epsFinalMass = (hybridOptimisationSettings_->weightMass_*(1 - finalMass/initialSpacecraftMass_));
+    aof_vector(7) = epsFinalMass;
 
     // Some debugging statements we don't actually directly output the fitness
     if (hybridOptimisationSettings_->debug_) {
         double totalEps = aof_vector.sum();
         std::cout << "    cfun : [" << costatesFunction_(0.0).transpose() << "] | [" << costatesFunction_(timeOfFlight_).transpose() << "]" << std::endl;
         std::cout << "    x_f  : " << finalPropagatedState.transpose() << std::endl;
-        std::cout << "    err  :" << error.transpose() << std::endl;
+        std::cout << "    err  : " << error.transpose() << std::endl;
+        std::cout << "    eps  : " << aof_vector.transpose() <<std::endl;
         std::cout << "    sum_e: " << totalEps << std::endl;
         std::cout << "  --end.model--" << std::endl;
     }
