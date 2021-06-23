@@ -64,6 +64,29 @@ public:
         // Retrieve initial mass of the spacecraft.
         initialSpacecraftMass_ = bodyMap_[ bodyToPropagate_ ]->getBodyMass();
 
+        // Retrieve initial and final semiparameter of initial and target orbit as used for costate scaling
+        double centralBodyGravitationalParameter = bodyMap_.at( centralBody_ )->getGravityFieldModel( )->getGravitationalParameter( );
+
+        double initialSemiParameter =
+                orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
+                        stateAtDeparture_, centralBodyGravitationalParameter, 0 )[0];
+
+        double finalSemiParameter =
+                orbital_element_conversions::convertCartesianToModifiedEquinoctialElements(
+                        stateAtArrival_, centralBodyGravitationalParameter, 0 )[0];
+
+        // Set up costate scaling
+        Eigen::VectorXd scaledInitialCoStates = initialCoStates_;
+        Eigen::VectorXd scaledFinalCoStates = finalCoStates_;
+
+        // Scale semi-parameter costate
+        scaledInitialCoStates[0] = initialCoStates_[0] / initialSemiParameter;
+        scaledFinalCoStates[0] = finalCoStates_[0] / finalSemiParameter;
+
+        // Scale mass costate
+        scaledInitialCoStates[5] = initialCoStates_[5] * specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION;
+        scaledFinalCoStates[5] = finalCoStates_[5] * specificImpulse_ * physical_constants::SEA_LEVEL_GRAVITATIONAL_ACCELERATION;
+
         // Define function returning the current MEE costates.
         costatesFunction_ = [ = ]( const double currentTime )
         {
@@ -71,8 +94,8 @@ public:
 
             for ( int i = 0 ; i < 6 ; i++ )
             {
-                currentCostates[ i ] = initialCoStates_[ i ]
-                        + ( currentTime / timeOfFlight_ ) * ( finalCoStates_[ i ] - initialCoStates_[ i ] );
+                currentCostates[ i ] = scaledInitialCoStates[ i ]
+                        + ( currentTime / timeOfFlight_ ) * ( scaledFinalCoStates[ i ] - scaledInitialCoStates[ i ] );
             }
             return currentCostates;
         };
