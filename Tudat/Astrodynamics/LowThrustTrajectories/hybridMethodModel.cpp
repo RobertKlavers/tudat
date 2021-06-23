@@ -120,10 +120,31 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
     massRateModel[ bodyToPropagate_ ] = createMassRateModel( bodyToPropagate_, std::make_shared< simulation_setup::FromThrustMassModelSettings >( 1 ),
                                                        bodyMap_, accelerationModelMap );
 
-    // Ensure that the propagation stops when the required time of flight is required.
-    std::shared_ptr< propagators::PropagationTimeTerminationSettings > terminationSettings
-            = std::make_shared< propagators::PropagationTimeTerminationSettings >( finalTime, true );
+    // Termination Settings set up
+    std::shared_ptr< propagators::PropagationTerminationSettings > terminationSettings;
 
+    // Terminate when periapsis is too low
+    std::shared_ptr< propagators::SingleDependentVariableSaveSettings > altitudeTerminationVariable =
+            std::make_shared< propagators::SingleDependentVariableSaveSettings >(
+                    propagators::periapsis_altitude_dependent_variable, bodyToPropagate_, centralBody_ );
+
+    // Terminate when eccentricity is too large
+    std::shared_ptr< propagators::SingleDependentVariableSaveSettings > eccentricityTerminationVariable =
+            std::make_shared<propagators::SingleDependentVariableSaveSettings>(
+                    propagators::keplerian_state_dependent_variable, bodyToPropagate_, centralBody_, 1);
+
+    // Terminate for hyperbolic trajectory
+    std::vector< std::shared_ptr< propagators::PropagationTerminationSettings > > terminationSettingsList;
+
+    // TODO: Configure termination boundaries 'magic' values
+    terminationSettingsList.push_back(std::make_shared< propagators::PropagationTimeTerminationSettings >( finalTime, false ));
+    terminationSettingsList.push_back(std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(altitudeTerminationVariable, 150.0e3, 1, false));
+    terminationSettingsList.push_back(std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(eccentricityTerminationVariable, 0.9, 0, false));
+
+    terminationSettings = std::make_shared< propagators::PropagationHybridTerminationSettings >(
+            terminationSettingsList, true );
+
+    // Dependent variables set up
     std::vector<std::shared_ptr<propagators::SingleDependentVariableSaveSettings> > dependentVariablesList;
 
     dependentVariablesList.push_back(std::make_shared<propagators::SingleDependentVariableSaveSettings>(
@@ -133,8 +154,6 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
     dependentVariablesList.push_back(std::make_shared<propagators::SingleDependentVariableSaveSettings>(
             propagators::lvlh_to_inertial_frame_rotation_dependent_variable, bodyToPropagate_, centralBody_));
 
-    // dependentVariablesList.push_back( std::make_shared< propagators::SingleDependentVariableSaveSettings >(
-    //         propagators::rotation_matrix_to_body_fixed_frame_variable, "Vehicle", "Earth" ) );
     std::shared_ptr<propagators::DependentVariableSaveSettings> dependentVariablesToSave =
             std::make_shared<propagators::DependentVariableSaveSettings>(dependentVariablesList, withDependent);
 
