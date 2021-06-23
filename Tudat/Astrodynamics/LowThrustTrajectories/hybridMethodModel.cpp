@@ -192,23 +192,21 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
 //! Propagate the spacecraft trajectory to time-of-flight.
 Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
 {
-    Eigen::Vector6d propagatedState = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
-    return propagatedState;
+    Eigen::VectorXd propagationResult = propagateTrajectory( 0.0, timeOfFlight_, stateAtDeparture_, initialSpacecraftMass_ ).first;
+    massAtTimeOfFlight_ = propagationResult[ 6 ];
+    return propagationResult.segment( 0, 6 );
 }
 
 //! Propagate the spacecraft trajectory to a given time.
-std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass)
+std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass)
 {
     integratorSettings_->initialTime_ = initialTime;
-
     propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(initialTime, finalTime, initialState, initialMass, integratorSettings_);
 
     std::map< double, Eigen::Matrix< double, Eigen::Dynamic, 1 > > numericalSolution =
             dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
     Eigen::VectorXd propagationOriginalResult = dynamicsSimulator.getEquationsOfMotionNumericalSolution( ).rbegin( )->second;
 
-    // Retrieve state and mass of the spacecraft at the end of the propagation.
-    Eigen::Vector6d propagatedState = propagationOriginalResult.segment( 0, 6 );
     Eigen::Vector6d computedMMEStateDerivatives;
 
     if ( finalTime == timeOfFlight_ )
@@ -216,7 +214,7 @@ std::pair<Eigen::Vector6d, Eigen::Vector6d> HybridMethodModel::propagateTrajecto
         massAtTimeOfFlight_ = propagationOriginalResult[ 6 ];
     }
 
-    return {propagatedState, computedMMEStateDerivatives};
+    return {propagationOriginalResult, computedMMEStateDerivatives};
 }
 
 //! Propagate the trajectory to set of epochs.
@@ -254,15 +252,16 @@ std::map< double, Eigen::Vector6d > HybridMethodModel::propagateTrajectory(
         {
             if ( currentTime > 0.0 )
             {
-                propagatedState = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass).first;
-                currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
-            }
+                Eigen::VectorXd propagationResult = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass).first;
+                propagatedState = propagationResult.segment(0, 6);
+                currentMass = propagationResult[6];}
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
         else
         {
-            propagatedState = propagateTrajectory( epochs[ epochIndex - 1 ], currentTime, propagatedState, currentMass).first;
-            currentMass = bodyMap_[ bodyToPropagate_ ]->getBodyMass( );
+            Eigen::VectorXd propagationResult = propagateTrajectory( 0.0, currentTime, propagatedState, currentMass).first;
+            propagatedState = propagationResult.segment(0, 6);
+            currentMass = propagationResult[6];
             propagatedTrajectory[ currentTime ] = propagatedState;
         }
 
