@@ -16,7 +16,7 @@
 #include "Tudat/Mathematics/NumericalQuadrature/trapezoidQuadrature.h"
 #include "Tudat/Mathematics/NumericalQuadrature/createNumericalQuadrature.h"
 #include "Tudat/Astrodynamics/BasicAstrodynamics/modifiedEquinoctialElementConversions.h"
-
+int epochCount = 0;
 namespace tudat
 {
 namespace low_thrust_trajectories
@@ -90,13 +90,19 @@ basic_astrodynamics::AccelerationMap HybridMethodModel::getLowThrustTrajectoryAc
     return accelerationModelMap;
 }
 
+bool customTerminationFunction(double time, int numberOfEpochs) {
+    epochCount++;
+    return (epochCount >= numberOfEpochs);
+}
+
 propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulator(
         double initialTime,
         double finalTime,
         Eigen::Vector6d initialState,
         double initialMass,
         std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
-        bool withDependent
+        bool withDependent,
+        bool useOA
         ) {
     // Re-initialise integrator settings.
     integratorSettings->initialTime_ = initialTime;
@@ -133,13 +139,22 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
             std::make_shared<propagators::SingleDependentVariableSaveSettings>(
                     propagators::keplerian_state_dependent_variable, bodyToPropagate_, centralBody_, 1);
 
-    // Terminate for hyperbolic trajectory
     std::vector< std::shared_ptr< propagators::PropagationTerminationSettings > > terminationSettingsList;
 
     // TODO: Configure termination boundaries 'magic' values
     terminationSettingsList.push_back(std::make_shared< propagators::PropagationTimeTerminationSettings >( finalTime, false ));
     terminationSettingsList.push_back(std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(altitudeTerminationVariable, 150.0e3, 1, false));
     terminationSettingsList.push_back(std::make_shared< propagators::PropagationDependentVariableTerminationSettings >(eccentricityTerminationVariable, 0.9, 0, false));
+
+    if (useOA) {
+        //TODO: From Configuration
+        int numberOfEpochs = 40;
+        epochCount = 0;
+        std::shared_ptr< propagators::PropagationTerminationSettings > customTerminationSettings =
+                std::make_shared< propagators::PropagationCustomTerminationSettings >(
+                        std::bind( &customTerminationFunction, std::placeholders::_1, numberOfEpochs ) );
+        terminationSettingsList.push_back(customTerminationSettings);
+    }
 
     terminationSettings = std::make_shared< propagators::PropagationHybridTerminationSettings >(
             terminationSettingsList, true );
@@ -196,6 +211,113 @@ Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
     massAtTimeOfFlight_ = propagationResult[ 6 ];
     return propagationResult.segment( 0, 6 );
 }
+
+std::map<double, Eigen::Vector6d> HybridMethodModel::propagateTrajectoryOA(double averagingTime, int numberOfSteps ) {
+    // Set up initial conditions for the first OA Arc
+    double stepSize = 2.0 * mathematical_constants::PI / numberOfSteps;
+    double initialArcTime = 0.0;
+    double initialArcMass = initialSpacecraftMass_;
+    Eigen::Vector6d initialArcState = stateAtDeparture_;
+
+    // Store trajectory results
+    std::map< double, Eigen::Vector6d > resultOATrajectory;
+    resultOATrajectory[initialArcTime] = initialArcState;
+
+    // Minimum number of OA Arcs needed to reach TOF
+    int numberOfOAarcs = floor(timeOfFlight_ / averagingTime);
+
+    // Propagate each OA Arc
+    for (int i = 0; i < numberOfOAarcs + 1; i++) {
+        // Set up specific settings for this OA Arc
+        std::shared_ptr<numerical_integrators::IntegratorSettings<double> > integratorSettings =
+                std::make_shared<numerical_integrators::IntegratorSettings<double> >
+                        (numerical_integrators::rungeKutta4, initialArcTime, stepSize);
+
+        propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(initialArcTime, timeOfFlight_, initialArcState, initialArcMass, integratorSettings, false, true);
+
+
+        // Check if the propagation was terminated for the expected single orbital evolution termination condition, stop
+        // execution completely
+        propagators::PropagationTerminationReason terminationReason = dynamicsSimulator.getPropagationTerminationReason()->getPropagationTerminationReason();
+        std::shared_ptr< propagators::HybridPropagationTerminationCondition > hybridPropagationTerminationCondition =
+                std::dynamic_pointer_cast< propagators::HybridPropagationTerminationCondition >( dynamicsSimulator.getPropagationTerminationCondition( ) );
+
+        // Expected order is: 0) time termination, 1) altitude termination, 2) eccentricity termination, 3) custom termination
+        std::vector<bool> terminationConditionsMet = hybridPropagationTerminationCondition->getIsConditionMetWhenStopping();
+
+        bool terminatedOnSingleRevolution = (
+                terminationReason == propagators::termination_condition_reached &&
+                terminationConditionsMet[3]);
+
+        if (!terminatedOnSingleRevolution) {
+            break;
+        }
+
+        // Integrate single OA Arc, not that MEE are expected
+        std::map< double, Eigen::VectorXd > rawNumericalSolution = dynamicsSimulator.getEquationsOfMotionNumericalSolutionRaw( );
+
+
+        // Keep track of the state derivatives and time epochs
+        std::vector<Eigen::VectorXd> stateDerivatives;
+        std::vector<double> timeEpochs;
+
+        for( std::pair<double, Eigen::VectorXd> element : rawNumericalSolution ) {
+            Eigen::VectorXd stateDerivative = dynamicsSimulator.getDynamicsStateDerivative( )->computeStateDerivative(element.first, element.second);
+            stateDerivatives.emplace_back(stateDerivative);
+            timeEpochs.emplace_back(element.first);
+        }
+
+        // Retrieve gravitational parameter for convenience
+        double gravitationalParameter = bodyMap_[centralBody_]->getGravityFieldModel()->getGravitationalParameter();
+
+        // Use Trapezoidal Quadrature Integrator (in time) to integrate states
+        tudat::numerical_quadrature::TrapezoidNumericalQuadrature< double, Eigen::VectorXd > integrator(timeEpochs, stateDerivatives);
+        Eigen::VectorXd computedIntegralTrapezoid = integrator.getQuadrature();
+
+        // Calculate the orbital period from the calculated time steps
+        double orbitalPeriod = (timeEpochs.back() - timeEpochs.front());
+
+        // Averages for this revolution
+        Eigen::VectorXd averageStateProgression = computedIntegralTrapezoid / orbitalPeriod;
+
+        double finalOAtime = initialArcTime + averagingTime;
+
+        // Only propagate up to the time of flight
+        if (finalOAtime > timeOfFlight_) {
+            finalOAtime = timeOfFlight_;
+        }
+
+        Eigen::VectorXd finalOAArcState = rawNumericalSolution.rbegin()->second + (averageStateProgression * (finalOAtime - timeEpochs.back()));
+        Eigen::Vector6d finalOAArcMEEState = finalOAArcState.segment(0,6);
+
+        // Some debug printing for convenience
+        if (hybridOptimisationSettings_->debug_) {
+            std::cout << "== DEBUG == (" << i << ")" << std::endl;
+            std::cout << "  -- Initial State --" << std::endl;
+            std::cout << "    initialArcTime: " << initialArcTime/physical_constants::JULIAN_DAY << " days" << std::endl;
+            std::cout << "    initialArcState: " << initialArcState.transpose() << std::endl;
+            std::cout << "    initialArcMass: " << initialArcMass << std::endl;
+            std::cout << "  -- Results --" << std::endl;
+            std::cout << "    stateDerivatives: " << stateDerivatives.size() << std::endl;
+            std::cout << "    T_orb: " << orbitalPeriod << std::endl;
+            std::cout << "    Trapezoidal Integral: " << computedIntegralTrapezoid.transpose() << std::endl;
+            std::cout << "    averageStateProgression: " << averageStateProgression.transpose() << std::endl;
+            std::cout << "    finalOAArcState: " << finalOAArcState.transpose() << std::endl;
+            std::cout << "    finalOAArcMEEState: " << finalOAArcMEEState.transpose() << std::endl;
+        }
+
+
+        // Set up initial conditions for next OA Arc
+        initialArcTime = finalOAtime;
+        initialArcState = orbital_element_conversions::convertModifiedEquinoctialToCartesianElements(finalOAArcMEEState, gravitationalParameter, false);
+        initialArcMass = finalOAArcState[6];
+        resultOATrajectory[finalOAtime] = initialArcState;
+    }
+
+    massAtTimeOfFlight_ = initialArcMass;
+    return resultOATrajectory;
+}
+
 
 //! Propagate the spacecraft trajectory to a given time.
 std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass)
@@ -307,7 +429,10 @@ std::pair<Eigen::VectorXd, Eigen::Vector6d> HybridMethodModel::calculateFitness(
     }
 
     // Propagate until time of flight is reached.
-    Eigen::Vector6d finalPropagatedState = propagateTrajectory( );
+    // Eigen::Vector6d finalPropagatedState = propagateTrajectory( );
+
+    std::map<double, Eigen::Vector6d> finalOAResult = propagateTrajectoryOA(4.0 * physical_constants::JULIAN_DAY, 40);
+    Eigen::Vector6d finalPropagatedState = finalOAResult.rbegin()->second;
 
     // Convert final propagated state to MEE.
     Eigen::Vector6d finalPropagatedKeplerianState = orbital_element_conversions::convertCartesianToKeplerianElements(

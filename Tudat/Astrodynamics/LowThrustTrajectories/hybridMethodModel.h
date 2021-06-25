@@ -124,12 +124,15 @@ public:
             Eigen::Vector6d initialState,
             double initialMass,
             std::shared_ptr<numerical_integrators::IntegratorSettings < double>> integratorSettings,
-            bool withDependent = false);
+            bool withDependent = false,
+            bool useOA = false);
 
     std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> getTrajectoryOutput();
 
     //! Propagate the spacecraft trajectory to time of flight.
     Eigen::Vector6d propagateTrajectory( );
+
+    std::map<double, Eigen::Vector6d> propagateTrajectoryOA(double averagingTime, int numberOfSteps);
 
     //! Propagate the spacecraft trajectory to a given time.
     std::pair<Eigen::VectorXd, Eigen::Vector6d> propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass);
