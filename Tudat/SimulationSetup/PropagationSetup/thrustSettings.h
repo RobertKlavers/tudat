@@ -115,10 +115,12 @@ public:
     ThrustDirectionFromStateGuidanceSettings(
             const std::string& centralBody,
             const bool isColinearWithVelocity,
-            const bool directionIsOppositeToVector ):
+            const bool directionIsOppositeToVector,
+            const bool useOutOfPlaneGuidance = false):
         ThrustDirectionGuidanceSettings( colinear_with_state_segment_thrust_direction, centralBody ),
         isColinearWithVelocity_( isColinearWithVelocity ),
-        directionIsOppositeToVector_( directionIsOppositeToVector ){ }
+        directionIsOppositeToVector_( directionIsOppositeToVector ),
+        useOutOfPlaneGuidance_( useOutOfPlaneGuidance ){ }
 
     //! Destructor
     ~ThrustDirectionFromStateGuidanceSettings( ){ }
@@ -128,6 +130,8 @@ public:
 
     //! Boolean denoting whether the thrust is in the direction of position/velocity of x_{thrusting body}-x_{central body}/
     bool directionIsOppositeToVector_;
+
+    bool useOutOfPlaneGuidance_;
 
 };
 

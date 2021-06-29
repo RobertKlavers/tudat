@@ -47,6 +47,11 @@ std::shared_ptr< propulsion::BodyFixedForceDirectionGuidance  > createThrustGuid
                     std::bind( &Body::getState, bodyMap.at( nameOfBodyWithGuidance ) );
             std::function< Eigen::Vector6d( ) > centralBodyStateFunction;
 
+            std::function< Eigen::Quaterniond( ) > rotationFunction = std::bind(
+                    &simulation_setup::Body::getCurrentRotationToGlobalFrame,
+                    bodyMap.at( nameOfBodyWithGuidance ) );
+
+
             // Retrieve state function of central body (or set to zero if inertial)
             if( thrustDirectionFromStateGuidanceSettings->relativeBody_ != "SSB" &&
                     thrustDirectionFromStateGuidanceSettings->relativeBody_ != "" )
@@ -67,18 +72,22 @@ std::shared_ptr< propulsion::BodyFixedForceDirectionGuidance  > createThrustGuid
                         &ephemerides::getRelativeState, std::placeholders::_1, bodyStateFunction, centralBodyStateFunction );
             std::function< Eigen::Vector3d( const double ) > thrustDirectionFunction;
 
-            // Create force direction function.
-            if( thrustDirectionFromStateGuidanceSettings->isColinearWithVelocity_ )
-            {
-                thrustDirectionFunction =
-                        std::bind( &propulsion::getForceDirectionColinearWithVelocity, stateFunction, std::placeholders::_1,
-                                     thrustDirectionFromStateGuidanceSettings->directionIsOppositeToVector_ );
-            }
-            else
-            {
-                thrustDirectionFunction =
-                        std::bind( &propulsion::getForceDirectionColinearWithPosition, stateFunction, std::placeholders::_1,
-                                     thrustDirectionFromStateGuidanceSettings->directionIsOppositeToVector_ );
+            if (thrustDirectionFromStateGuidanceSettings->useOutOfPlaneGuidance_) {
+                thrustDirectionFunction = std::bind(&propulsion::getOufOfPlaneForceDirection, stateFunction, std::placeholders::_1);
+            } else {
+                // Create force direction function.
+                if( thrustDirectionFromStateGuidanceSettings->isColinearWithVelocity_ )
+                {
+                    thrustDirectionFunction =
+                            std::bind( &propulsion::getForceDirectionColinearWithVelocity, stateFunction, std::placeholders::_1,
+                                       thrustDirectionFromStateGuidanceSettings->directionIsOppositeToVector_ );
+                }
+                else
+                {
+                    thrustDirectionFunction =
+                            std::bind( &propulsion::getForceDirectionColinearWithPosition, stateFunction, std::placeholders::_1,
+                                       thrustDirectionFromStateGuidanceSettings->directionIsOppositeToVector_ );
+                }
             }
 
             // Create direction guidance

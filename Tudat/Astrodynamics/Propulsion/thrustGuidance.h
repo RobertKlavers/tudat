@@ -99,11 +99,9 @@ protected:
     Eigen::Vector3d currentBodyFixedForceDirection_;
 };
 
-Eigen::Vector3d getForceDirectionOutOfPlane(
+Eigen::Vector3d getOufOfPlaneForceDirection(
         const std::function< void( Eigen::Vector6d& ) > currentStateFunction,
-        const std::function< Eigen::Quaterniond() > rotationToGlobalFrameFunction,
-        const double currentTime, const bool putForceInOppositeDirection );
-
+        const double currentTime );
 
 //! Function to get the unit vector colinear with velocity segment of a translational state.
 /*!
