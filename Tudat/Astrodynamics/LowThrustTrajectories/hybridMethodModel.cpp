@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <Tudat/SimulationSetup/tudatSimulationHeader.h>
+#include <Tudat/SimulationSetup/hybridOptimisationSettings.h>
 #include "Tudat/Astrodynamics/LowThrustTrajectories/hybridMethodModel.h"
 #include "Tudat/Mathematics/NumericalQuadrature/trapezoidQuadrature.h"
 #include "Tudat/Mathematics/NumericalQuadrature/createNumericalQuadrature.h"
@@ -23,6 +24,43 @@ namespace low_thrust_trajectories
 {
 
 using namespace orbital_element_conversions;
+
+std::shared_ptr< simulation_setup::AccelerationSettings > HybridMethodModel::getTangentialThrustAccelerationSettings() {
+    std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
+            std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, true, false );
+    std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings =
+            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
+
+    // Define acceleration model settings.
+    std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > accelerationsOfVehicle;
+    return std::make_shared< simulation_setup::ThrustAccelerationSettings >( thrustDirectionGuidanceSettings, thrustMagnitudeSettings );
+}
+
+std::shared_ptr< simulation_setup::AccelerationSettings > HybridMethodModel::getRadialThrustAccelerationSettings() {
+    std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
+            std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, false, false );
+    std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings =
+            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
+
+    // Define acceleration model settings.
+    std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > accelerationsOfVehicle;
+    return std::make_shared< simulation_setup::ThrustAccelerationSettings >( thrustDirectionGuidanceSettings, thrustMagnitudeSettings );
+}
+
+std::shared_ptr< simulation_setup::AccelerationSettings > HybridMethodModel::getOutOfPlaneThrustAccelerationSettings() {
+    // getForceDirectionOutOfPlane
+
+    std::shared_ptr< simulation_setup::ThrustDirectionGuidanceSettings > thrustDirectionGuidanceSettings =
+            std::make_shared< simulation_setup::ThrustDirectionFromStateGuidanceSettings >( centralBody_, false, true, true );
+
+    std::shared_ptr< simulation_setup::ThrustMagnitudeSettings > thrustMagnitudeSettings =
+            std::make_shared< simulation_setup::ConstantThrustMagnitudeSettings >( maximumThrust_, specificImpulse_ );
+
+    // Define acceleration model settings.
+    std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > accelerationsOfVehicle;
+    return std::make_shared< simulation_setup::ThrustAccelerationSettings >( thrustDirectionGuidanceSettings, thrustMagnitudeSettings );
+}
+
 
 //! Retrieve MEE costates-based thrust acceleration.
 std::shared_ptr< simulation_setup::AccelerationSettings > HybridMethodModel::getMEEcostatesBasedThrustAccelerationSettings( )
@@ -77,8 +115,25 @@ basic_astrodynamics::AccelerationMap HybridMethodModel::getLowThrustTrajectoryAc
     // Acceleration from the central body.
     std::map< std::string, std::vector< std::shared_ptr< simulation_setup::AccelerationSettings > > > bodyToPropagateAccelerations;
     bodyToPropagateAccelerations[ centralBody_ ].push_back( std::make_shared< simulation_setup::AccelerationSettings >(
-                                                                basic_astrodynamics::central_gravity ) );
-    bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
+            basic_astrodynamics::central_gravity ) );
+
+    switch(hybridOptimisationSettings_->propagationType_) {
+        case simulation_setup::tangential: {
+            bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getTangentialThrustAccelerationSettings( ) );
+            break;
+        }
+        case simulation_setup::radial: {
+            bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getRadialThrustAccelerationSettings( ) );
+            break;
+        }
+        case simulation_setup::outofplane: {
+            bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getOutOfPlaneThrustAccelerationSettings( ) );
+            break;
+        }
+        case simulation_setup::costates: {
+            bodyToPropagateAccelerations[ bodyToPropagate_ ].push_back( getMEEcostatesBasedThrustAccelerationSettings( ) );
+        }
+    }
 
     simulation_setup::SelectedAccelerationMap accelerationMap;
     accelerationMap[ bodyToPropagate_ ] = bodyToPropagateAccelerations;
@@ -102,11 +157,11 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
         double initialMass,
         std::shared_ptr< numerical_integrators::IntegratorSettings< double > > integratorSettings,
         bool withDependent,
-        bool useOA
+        bool useOA,
+        int numberOfSteps
         ) {
     // Re-initialise integrator settings.
     integratorSettings->initialTime_ = initialTime;
-
     bodyMap_[bodyToPropagate_]->setConstantBodyMass(initialMass);
 
     // std::cout << "t0: " << initialTime << ", tf: " << finalTime << std::endl;
@@ -148,11 +203,10 @@ propagators::SingleArcDynamicsSimulator<> HybridMethodModel::getDynamicsSimulato
 
     if (useOA) {
         //TODO: From Configuration
-        int numberOfEpochs = 40;
         epochCount = 0;
         std::shared_ptr< propagators::PropagationTerminationSettings > customTerminationSettings =
                 std::make_shared< propagators::PropagationCustomTerminationSettings >(
-                        std::bind( &customTerminationFunction, std::placeholders::_1, numberOfEpochs ) );
+                        std::bind( &customTerminationFunction, std::placeholders::_1, numberOfSteps ) );
         terminationSettingsList.push_back(customTerminationSettings);
     }
 
@@ -212,6 +266,56 @@ Eigen::Vector6d HybridMethodModel::propagateTrajectory( )
     return propagationResult.segment( 0, 6 );
 }
 
+std::map<double, Eigen::VectorXd> HybridMethodModel::propagateTrajectoryBenchmark(double stepSize) {
+    // Set up specific settings for this OA Arc
+    std::shared_ptr<numerical_integrators::IntegratorSettings<double> > integratorSettings =
+            std::make_shared<numerical_integrators::IntegratorSettings<double> >
+                    (numerical_integrators::rungeKutta4, 0.0, stepSize);
+
+    // Re-initialise integrator settings.
+    bodyMap_[bodyToPropagate_]->setConstantBodyMass(initialSpacecraftMass_);
+    basic_astrodynamics::AccelerationMap accelerationModelMap = getLowThrustTrajectoryAccelerationMap();
+
+    // Create mass rate models
+    std::map< std::string, std::shared_ptr< basic_astrodynamics::MassRateModel > > massRateModel;
+    massRateModel[ bodyToPropagate_ ] = createMassRateModel( bodyToPropagate_, std::make_shared< simulation_setup::FromThrustMassModelSettings >( 1 ),
+                                                             bodyMap_, accelerationModelMap );
+
+    // Termination Settings set up
+    std::shared_ptr< propagators::PropagationTerminationSettings > terminationSettings;
+    terminationSettings = std::make_shared< propagators::PropagationTimeTerminationSettings >( timeOfFlight_, false );
+
+    // Define propagator settings.
+    std::shared_ptr<propagators::TranslationalStatePropagatorSettings<double> > translationalStatePropagatorSettings =
+            std::make_shared<propagators::TranslationalStatePropagatorSettings<double> >(
+                    std::vector<std::string>{centralBody_}, accelerationModelMap,
+                    std::vector<std::string>{bodyToPropagate_},
+                    stateAtDeparture_, terminationSettings, propagators::cowell);
+
+    // Create settings for propagating the mass of the vehicle.
+    std::shared_ptr<propagators::MassPropagatorSettings<double> > massPropagatorSettings
+            = std::make_shared<propagators::MassPropagatorSettings<double> >(
+                    std::vector<std::string>{bodyToPropagate_}, massRateModel,
+                    (Eigen::Matrix<double, 1, 1>() << bodyMap_[bodyToPropagate_]->getBodyMass()).finished(),
+                    terminationSettings);
+
+    // Create list of propagation settings.
+    std::vector<std::shared_ptr<propagators::SingleArcPropagatorSettings<double> > > propagatorSettingsVector;
+    propagatorSettingsVector.push_back(translationalStatePropagatorSettings);
+    propagatorSettingsVector.push_back(massPropagatorSettings);
+
+    // Hybrid propagation settings.
+    std::shared_ptr<propagators::PropagatorSettings<double> > propagatorSettings =
+            std::make_shared<propagators::MultiTypePropagatorSettings<double> >(propagatorSettingsVector,
+                                                                                terminationSettings);
+
+    // Propagate the trajectory.
+    propagators::SingleArcDynamicsSimulator<> dynamicsSimulator(bodyMap_, integratorSettings, propagatorSettings);
+
+    return dynamicsSimulator.getEquationsOfMotionNumericalSolution();
+}
+
+
 std::map<double, Eigen::Vector6d> HybridMethodModel::propagateTrajectoryOA(double averagingTime, int numberOfSteps ) {
     // Set up initial conditions for the first OA Arc
     double stepSize = 2.0 * mathematical_constants::PI / numberOfSteps;
@@ -233,8 +337,7 @@ std::map<double, Eigen::Vector6d> HybridMethodModel::propagateTrajectoryOA(doubl
                 std::make_shared<numerical_integrators::IntegratorSettings<double> >
                         (numerical_integrators::rungeKutta4, initialArcTime, stepSize);
 
-        propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(initialArcTime, timeOfFlight_, initialArcState, initialArcMass, integratorSettings, false, true);
-
+        propagators::SingleArcDynamicsSimulator< > dynamicsSimulator = getDynamicsSimulator(initialArcTime, timeOfFlight_, initialArcState, initialArcMass, integratorSettings, false, true, numberOfSteps);
 
         // Check if the propagation was terminated for the expected single orbital evolution termination condition, stop
         // execution completely

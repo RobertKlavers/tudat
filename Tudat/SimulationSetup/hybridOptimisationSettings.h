@@ -28,14 +28,24 @@
 namespace tudat {
 
     namespace simulation_setup {
+        enum PropagationType {
+            tangential,
+            radial,
+            outofplane,
+            costates
+        };
+
         class HybridOptimisationSettings {
         public:
             HybridOptimisationSettings(const Eigen::Vector6d epsilonUpper, const Eigen::Vector6d constraintWeights,
-                                       const double weightMass, const double weightTimeOfFlight, const bool debug) :
+                                       const double weightMass, const double weightTimeOfFlight, const bool debug, PropagationType propagationType) :
                     epsilonUpper_(epsilonUpper),
                     constraintWeights_(constraintWeights),
                     weightMass_(weightMass),
-                    weightTimeOfFlight_(weightTimeOfFlight), debug_(debug) {}
+                    weightTimeOfFlight_(weightTimeOfFlight),
+                    debug_(debug),
+                    propagationType_(propagationType)
+                    {}
 
             //! Destructor.
             virtual ~HybridOptimisationSettings() {}
@@ -45,6 +55,7 @@ namespace tudat {
             const double weightMass_;
             const double weightTimeOfFlight_;
             const bool debug_;
+            PropagationType propagationType_;
         };
 
 

@@ -109,6 +109,10 @@ public:
     //! Default destructor.
     ~HybridMethodModel( ) { }
 
+    std::shared_ptr< simulation_setup::AccelerationSettings > getTangentialThrustAccelerationSettings();
+    std::shared_ptr< simulation_setup::AccelerationSettings > getRadialThrustAccelerationSettings();
+    std::shared_ptr< simulation_setup::AccelerationSettings > getOutOfPlaneThrustAccelerationSettings();
+
     //! Retrieve MEE costates-based thrust acceleration.
     std::shared_ptr< simulation_setup::AccelerationSettings > getMEEcostatesBasedThrustAccelerationSettings( );
 
@@ -125,13 +129,15 @@ public:
             double initialMass,
             std::shared_ptr<numerical_integrators::IntegratorSettings < double>> integratorSettings,
             bool withDependent = false,
-            bool useOA = false);
+            bool useOA = false,
+            int numberOfSteps = 0);
 
     std::pair<std::map< double, Eigen::VectorXd >, std::map< double, Eigen::VectorXd >> getTrajectoryOutput();
 
     //! Propagate the spacecraft trajectory to time of flight.
     Eigen::Vector6d propagateTrajectory( );
 
+    std::map<double, Eigen::VectorXd> propagateTrajectoryBenchmark(double stepSize);
     std::map<double, Eigen::Vector6d> propagateTrajectoryOA(double averagingTime, int numberOfSteps);
 
     //! Propagate the spacecraft trajectory to a given time.
