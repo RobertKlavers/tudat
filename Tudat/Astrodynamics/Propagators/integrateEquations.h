@@ -459,13 +459,18 @@ std::shared_ptr< PropagationTerminationDetails > integrateEquationsFromIntegrato
 
     double gravitationalParameter = 3.98600441e14;
     std::function<double(Eigen::VectorXd)> timeStepFunction = [=](Eigen::VectorXd stateVector) {
-        // TODO: Workaround to determine the time step based on a fixed step in true anomaly, as used for the hybrid
-        //  method. This should be extracted reworked when integratiuon is refactored.
-        // Use the approximation dtheta/dt ≈ n*a / r, delta t = delta theta * dt/dtheta, assuming stateVector is
-        // given in MEE
-        double radius = stateVector[0] / (1 + stateVector[1] * cos(stateVector[5]) + stateVector[2] * sin(stateVector[5]));
-        double semi_major_axis = stateVector[0] / (1 - pow(stateVector[1], 2) - pow(stateVector[2], 2));
-        return initialTimeStep * (radius / (semi_major_axis * sqrt(gravitationalParameter / pow(semi_major_axis, 3.0))));
+        if (initialTimeStep > mathematical_constants::PI * 2) {
+            // Even uglier hack to ensure I can still use Cowell for timesteps in seconds... I hate this
+            return initialTimeStep;
+        } else {
+            // TODO: Workaround to determine the time step based on a fixed step in true anomaly, as used for the hybrid
+            //  method. This should be extracted reworked when integratiuon is refactored.
+            // Use the approximation dtheta/dt ≈ n*a / r, delta t = delta theta * dt/dtheta, assuming stateVector is
+            // given in MEE
+            double radius = stateVector[0] / (1 + stateVector[1] * cos(stateVector[5]) + stateVector[2] * sin(stateVector[5]));
+            double semi_major_axis = stateVector[0] / (1 - pow(stateVector[1], 2) - pow(stateVector[2], 2));
+            return initialTimeStep * (radius / (semi_major_axis * sqrt(gravitationalParameter / pow(semi_major_axis, 3.0))));
+        }
     };
 
     // Get Initial state and time.
