@@ -138,13 +138,15 @@ public:
     Eigen::Vector6d propagateTrajectory( );
 
     std::map<double, Eigen::VectorXd> propagateTrajectoryBenchmark(double stepSize);
+
+    std::tuple<double, Eigen::VectorXd, Eigen::VectorXd> getStateIncrease(double initialTime, Eigen::Vector6d initialState, double initialMass, int numberOfSteps, double averagingTime);
     std::map<double, Eigen::Vector6d> propagateTrajectoryOA(double averagingTime, int numberOfSteps);
 
     //! Propagate the spacecraft trajectory to a given time.
     std::pair<Eigen::VectorXd, Eigen::Vector6d> propagateTrajectory( double initialTime, double finalTime, Eigen::Vector6d initialState, double initialMass);
 
     //! Propagate the trajectory to set of epochs as a function of theta.
-    std::pair< double, Eigen::Vector6d > computeAverages(const Eigen::Vector6d& currentState, double currentTime, int numberOfSteps, double averagingTime );
+    std::pair< double, Eigen::Vector6d > computeAverages(const Eigen::Vector6d& currentState, double currentTime, int numberOfSteps, double averagingTime);
 
     //! Propagate the trajectory to set of epochs.
     std::map< double, Eigen::Vector6d > propagateTrajectory(
